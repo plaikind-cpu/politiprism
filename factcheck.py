@@ -88,7 +88,9 @@ def is_duplicate_claim(claim_text, politician_id, date_str):
 # ── Step 2: Search for evidence ──────────────────────────────────────────────
 
 def search_for_claim(claim_text):
-    results = brave_news_search(claim_text[:120])
+    # Bias toward verification/fact-check articles rather than adjacent news
+    query = f"fact check {claim_text[:100]}"
+    results = brave_news_search(query[:120])
     return [{
         "title": r.get("title", ""),
         "url": r.get("url", ""),
@@ -122,6 +124,11 @@ Respond ONLY with this JSON object:
   "explanation": "2-3 sentences on whether the factual claim is accurate, citing specific evidence. Start with what the evidence shows, not with who said what.",
   "citations": [{{"title": "...", "url": "...", "snippet": "..."}}]
 }}
+
+Citation rules:
+- Only include sources that directly address the factual claim itself
+- Do NOT include sources merely because they mention {politician_name} or are topically adjacent
+- If no source directly addresses the claim, return an empty citations array
 
 Verdict definitions:
 - TRUE = evidence confirms the factual assertion
