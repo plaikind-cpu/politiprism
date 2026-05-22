@@ -80,13 +80,111 @@ td { padding: 8px 10px; border-bottom: 1px solid #1e2135; color: #c8c8e0; vertic
     </form>
 </div>
 
-<div class="section">
+<div class="section" id="pipeline-section">
     <h2>Pipeline</h2>
     <p style="color:#9d9db5;font-size:0.88rem;margin-bottom:14px;">
         Scheduled daily at 7:00 AM UTC. Run manually anytime.
     </p>
-    <a href="/admin/run-pipeline" class="action-link" style="font-size:0.95rem;">▶ Run Pipeline Now</a>
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+        <a href="/admin/run-pipeline" class="action-link" id="run-btn"
+           style="font-size:0.95rem;">▶ Run Pipeline Now</a>
+        <span id="pipeline-indicator" style="display:none;font-size:0.85rem;color:#e0a84a;">
+            ⚙ <span id="pipeline-stage">Running...</span>
+        </span>
+        <span id="pipeline-done" style="display:none;font-size:0.85rem;color:#4caf73;">
+            ✓ <span id="pipeline-done-msg"></span>
+        </span>
+    </div>
+    <div id="pipeline-progress" style="display:none;margin-top:12px;">
+        <div style="background:#0f1117;border-radius:6px;height:6px;overflow:hidden;">
+            <div id="progress-bar" style="background:#6c63ff;height:100%;width:0%;transition:width 0.5s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.78rem;color:#9d9db5;">
+            <span id="progress-label">Statements: 0 / 0</span>
+            <span id="claims-label">Claims found: 0</span>
+        </div>
+    </div>
 </div>
+
+<script>
+(function() {
+    var pollInterval = null;
+    var wasPreviouslyRunning = false;
+
+    function disableActions(running) {
+        var runBtn = document.getElementById("run-btn");
+        var clearBtns = document.querySelectorAll(".clear-btn");
+        if (running) {
+            runBtn.style.opacity = "0.4";
+            runBtn.style.pointerEvents = "none";
+            clearBtns.forEach(function(b) {
+                b.style.opacity = "0.4";
+                b.style.pointerEvents = "none";
+            });
+        } else {
+            runBtn.style.opacity = "1";
+            runBtn.style.pointerEvents = "auto";
+            clearBtns.forEach(function(b) {
+                b.style.opacity = "1";
+                b.style.pointerEvents = "auto";
+            });
+        }
+    }
+
+    function poll() {
+        fetch("/admin/pipeline-status")
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var running = data.running === 1;
+                var indicator = document.getElementById("pipeline-indicator");
+                var doneEl = document.getElementById("pipeline-done");
+                var progressEl = document.getElementById("pipeline-progress");
+                var stageEl = document.getElementById("pipeline-stage");
+                var progressBar = document.getElementById("progress-bar");
+                var progressLabel = document.getElementById("progress-label");
+                var claimsLabel = document.getElementById("claims-label");
+                var doneMsg = document.getElementById("pipeline-done-msg");
+
+                disableActions(running);
+
+                if (running) {
+                    wasPreviouslyRunning = true;
+                    indicator.style.display = "inline";
+                    doneEl.style.display = "none";
+                    stageEl.textContent = data.stage || "Running...";
+
+                    var total = data.statements_total || 0;
+                    var done = data.statements_done || 0;
+                    var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+                    if (total > 0) {
+                        progressEl.style.display = "block";
+                        progressBar.style.width = pct + "%";
+                        progressLabel.textContent = "Statements: " + done + " / " + total;
+                        claimsLabel.textContent = "Claims found: " + (data.claims_found || 0);
+                    }
+                } else {
+                    indicator.style.display = "none";
+                    progressEl.style.display = "none";
+                    if (wasPreviouslyRunning || data.claims_found > 0) {
+                        doneEl.style.display = "inline";
+                        doneMsg.textContent = data.stage || "Complete";
+                    }
+                    if (wasPreviouslyRunning) {
+                        wasPreviouslyRunning = false;
+                        clearInterval(pollInterval);
+                        pollInterval = setInterval(poll, 5000);
+                    }
+                }
+            })
+            .catch(function() {});
+    }
+
+    // Start polling every 3s
+    poll();
+    pollInterval = setInterval(poll, 3000);
+})();
+</script>
 
 <div class="section">
     <h2>Clear Data</h2>
@@ -101,7 +199,7 @@ td { padding: 8px 10px; border-bottom: 1px solid #1e2135; color: #c8c8e0; vertic
                               padding:7px 10px;border-radius:6px;font-size:0.85rem;"
                        value="{{ today }}">
                 <button type="submit"
-                        onclick="return confirm('Clear all claims and statements for this date?')"
+                        onclick="return confirm('Clear all claims and statements for this date?')" class="clear-btn"
                         style="background:#3d2e1e;color:#e0a84a;border:1px solid #e0a84a;
                                padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">
                     🗓 Clear Selected Date
@@ -109,7 +207,7 @@ td { padding: 8px 10px; border-bottom: 1px solid #1e2135; color: #c8c8e0; vertic
             </form>
         </div>
         <a href="/admin/clear-all"
-           onclick="return confirm('Clear ALL claims and statements? This cannot be undone.')"
+           onclick="return confirm('Clear ALL claims and statements? This cannot be undone.')" class="clear-btn"
            style="background:#3d1e1e;color:#e05c5c;border:1px solid #e05c5c;
                   padding:8px 16px;border-radius:6px;font-size:0.85rem;text-decoration:none;">
             🗑 Clear Everything
