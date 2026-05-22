@@ -64,6 +64,22 @@ def init_db():
         )
     """)
 
+    # Pipeline run status
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_status (
+            id INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton row
+            running INTEGER DEFAULT 0,
+            stage TEXT DEFAULT '',
+            statements_total INTEGER DEFAULT 0,
+            statements_done INTEGER DEFAULT 0,
+            claims_found INTEGER DEFAULT 0,
+            started_at TEXT,
+            finished_at TEXT
+        )
+    """)
+    # Ensure the singleton row exists
+    c.execute("INSERT OR IGNORE INTO pipeline_status (id) VALUES (1)")
+
     # Seed default politicians if table is empty
     c.execute("SELECT COUNT(*) FROM politicians")
     if c.fetchone()[0] == 0:

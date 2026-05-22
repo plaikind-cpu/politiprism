@@ -137,8 +137,9 @@ def digest():
 @app.route("/digest.pdf")
 @require_login
 def digest_pdf():
-    from weasyprint import HTML
+    from fpdf import FPDF
     from flask import Response
+
     date_str = request.args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
     conn = get_db()
     politicians = conn.execute("SELECT * FROM politicians WHERE active = 1").fetchall()
@@ -160,8 +161,140 @@ def digest_pdf():
                 claim["citations"] = json.loads(claim["citations"] or "[]")
             except:
                 claim["citations"] = []
-    html_str = render_template("digest_pdf.html", results=results, date=date_str, now=datetime.utcnow().strftime("%B %d, %Y %H:%M UTC"))
-    pdf_bytes = HTML(string=html_str, base_url=request.host_url).write_pdf()
+
+    VERDICT_COLORS = {
+        "TRUE":         (30, 100, 60),
+        "FALSE":        (180, 40, 40),
+        "MISLEADING":   (180, 110, 20),
+        "UNVERIFIABLE": (100, 100, 120),
+    }
+
+    def safe(text):
+        if not text:
+            return ""
+        return text.encode("latin-1", "replace").decode("latin-1")
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+    pdf.set_margins(18, 15, 18)
+
+    # Title
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.set_text_color(40, 40, 80)
+    pdf.cell(0, 10, "PolitiPrism - Fact-Check Digest", ln=True)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(120, 120, 140)
+    pdf.cell(0, 6, f"{date_str}  |  politiprism.app  |  Generated {datetime.utcnow().strftime('%B %d, %Y %H:%M UTC')}", ln=True)
+    pdf.ln(6)
+
+    # Summary table
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(40, 40, 80)
+    pdf.cell(0, 8, "Summary", ln=True)
+    pdf.set_draw_color(180, 180, 200)
+    pdf.line(18, pdf.get_y(), 192, pdf.get_y())
+    pdf.ln(3)
+
+    col_w = [42, 98, 28, 24]
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_fill_color(230, 230, 240)
+    pdf.set_text_color(60, 60, 80)
+    for header, w in zip(["Politician", "Claim", "Verdict", "Confidence"], col_w):
+        pdf.cell(w, 7, header, border=1, fill=True)
+    pdf.ln()
+
+    pdf.set_font("Helvetica", "", 7.5)
+    for group in results:
+        pol_name = safe(group["politician"]["name"])
+        # Group header row
+        pdf.set_fill_color(240, 240, 248)
+        pdf.set_text_color(60, 60, 100)
+        pdf.set_font("Helvetica", "B", 7.5)
+        pdf.cell(sum(col_w), 6, f"  {pol_name.upper()}  -  {safe(group['politician']['role'])}", border=1, fill=True, ln=True)
+        pdf.set_font("Helvetica", "", 7.5)
+        for claim in group["claims"]:
+            verdict = claim.get("verdict", "UNVERIFIABLE")
+            color = VERDICT_COLORS.get(verdict, (100, 100, 120))
+            pdf.set_text_color(60, 60, 80)
+            pdf.cell(col_w[0], 6, pol_name, border=1)
+            # Claim text — truncate if needed
+            claim_txt = safe(claim.get("claim_text", ""))
+            if len(claim_txt) > 95:
+                claim_txt = claim_txt[:92] + "..."
+            pdf.cell(col_w[1], 6, claim_txt, border=1)
+            pdf.set_text_color(*color)
+            pdf.set_font("Helvetica", "B", 7.5)
+            pdf.cell(col_w[2], 6, verdict, border=1)
+            pdf.set_text_color(100, 100, 120)
+            pdf.set_font("Helvetica", "", 7.5)
+            pdf.cell(col_w[3], 6, safe(claim.get("confidence", "")), border=1)
+            pdf.ln()
+
+    # Detailed section
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(40, 40, 80)
+    pdf.cell(0, 8, "Detailed Fact-Checks", ln=True)
+    pdf.set_draw_color(180, 180, 200)
+    pdf.line(18, pdf.get_y(), 192, pdf.get_y())
+    pdf.ln(4)
+
+    for group in results:
+        pol_name = safe(group["politician"]["name"])
+        pol_role = safe(group["politician"]["role"])
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(40, 40, 80)
+        pdf.cell(0, 7, f"{pol_name}  -  {pol_role}", ln=True)
+        pdf.set_draw_color(200, 200, 220)
+        pdf.line(18, pdf.get_y(), 192, pdf.get_y())
+        pdf.ln(3)
+
+        for claim in group["claims"]:
+            verdict = claim.get("verdict", "UNVERIFIABLE")
+            color = VERDICT_COLORS.get(verdict, (100, 100, 120))
+            conf = claim.get("confidence", "")
+
+            # Verdict badge line
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(*color)
+            pdf.cell(30, 6, verdict, ln=False)
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_text_color(140, 140, 160)
+            pdf.cell(0, 6, f"{conf} confidence", ln=True)
+
+            # Claim text
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(50, 50, 70)
+            pdf.multi_cell(0, 5, safe(f'"{claim.get("claim_text", "")}"'))
+            pdf.ln(1)
+
+            # Explanation
+            pdf.set_font("Helvetica", "", 8.5)
+            pdf.set_text_color(80, 80, 100)
+            pdf.multi_cell(0, 5, safe(claim.get("explanation", "")))
+
+            # Source
+            if claim.get("source_title"):
+                pdf.set_font("Helvetica", "", 7.5)
+                pdf.set_text_color(80, 80, 180)
+                pdf.cell(0, 5, safe(f"Source: {claim['source_title']}"), ln=True)
+
+            # Citations
+            for cite in claim.get("citations", [])[:2]:
+                if cite.get("title"):
+                    pdf.set_font("Helvetica", "", 7)
+                    pdf.set_text_color(100, 100, 180)
+                    pdf.cell(0, 4, safe(f"  - {cite['title']}"), ln=True)
+
+            pdf.ln(4)
+            pdf.set_draw_color(220, 220, 230)
+            pdf.line(18, pdf.get_y(), 192, pdf.get_y())
+            pdf.ln(3)
+
+        pdf.ln(2)
+
+    pdf_bytes = bytes(pdf.output())
     filename = f"PolitiPrism_{date_str}.pdf"
     return Response(
         pdf_bytes,
@@ -250,6 +383,19 @@ def trigger_pipeline():
     flash("Pipeline started — check Railway logs for progress.")
     return redirect(url_for("admin"))
 
+
+
+# ── Pipeline status API ───────────────────────────────────────────────────────
+
+@app.route("/admin/pipeline-status")
+@require_login
+def pipeline_status():
+    conn = get_db()
+    row = conn.execute("SELECT * FROM pipeline_status WHERE id=1").fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"running": 0, "stage": "idle"})
+    return jsonify(dict(row))
 
 # ── Clear data (admin only) ───────────────────────────────────────────────────
 
