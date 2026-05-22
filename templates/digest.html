@@ -1,26 +1,58 @@
 {% extends "base.html" %}
 {% block title %}PolitiPrism — Daily Digest{% endblock %}
 {% block extra_styles %}
-.date-nav { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+.date-nav { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
 .date-nav input[type=date] { background: #1a1d2e; border: 1px solid #3a3d5c;
                               color: #e0e0e0; padding: 7px 12px; border-radius: 6px; font-size: 0.95rem; }
 .date-nav button { background: #6c63ff; color: white; border: none;
                    padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+.run-btn { display: inline-block; background: #6c63ff; color: white; text-decoration: none;
+           padding: 9px 20px; border-radius: 6px; font-size: 0.9rem; }
+.pdf-btn { display: inline-block; background: #2e3150; color: #c8bfff; text-decoration: none;
+           padding: 9px 20px; border-radius: 6px; font-size: 0.9rem; border: 1px solid #6c63ff;
+           cursor: pointer; margin-left: 8px; }
+.pdf-btn:hover { background: #3a3d6e; }
+
+/* ── Summary table ── */
+.summary-block { background: #1a1d2e; border: 1px solid #2e3150; border-radius: 10px;
+                 padding: 20px 22px; margin-bottom: 36px; }
+.summary-block h2 { font-size: 1rem; color: #c8bfff; margin-bottom: 16px;
+                    border-bottom: 1px solid #2e3150; padding-bottom: 8px; }
+.summary-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.summary-table th { text-align: left; color: #9d9db5; padding: 6px 10px;
+                    border-bottom: 1px solid #2e3150; font-weight: 600; }
+.summary-table td { padding: 8px 10px; border-bottom: 1px solid #1a1d2e;
+                    vertical-align: top; color: #c8c8e0; }
+.summary-table tr:hover td { background: #1e2240; }
+.summary-table tr td:first-child { color: #9d9db5; font-size: 0.8rem; white-space: nowrap; }
+.st { display: inline-block; font-size: 0.72rem; font-weight: 700;
+      padding: 2px 9px; border-radius: 20px; white-space: nowrap; }
+.st-TRUE        { background: #1e3d2a; color: #4caf73; }
+.st-FALSE       { background: #3d1e1e; color: #e05c5c; }
+.st-MISLEADING  { background: #3d2e1e; color: #e0a84a; }
+.st-UNVERIFIABLE{ background: #2a2d3e; color: #9d9db5; }
+.summary-divider { font-size: 0.75rem; color: #6c63ff; font-weight: 600;
+                   padding: 10px 10px 4px; letter-spacing: 0.5px; }
+
+/* ── Detail cards ── */
+.section-label { font-size: 1rem; color: #c8bfff; font-weight: 600; margin: 36px 0 6px;
+                 border-bottom: 1px solid #2e3150; padding-bottom: 8px; }
+.section-label span { font-size: 0.82rem; color: #9d9db5; font-weight: 400; margin-left: 8px; }
 .politician-block { margin-bottom: 40px; }
 .politician-header { font-size: 1.2rem; font-weight: 600; color: #c8bfff;
                      border-bottom: 1px solid #2e3150; padding-bottom: 8px; margin-bottom: 16px; }
 .politician-header span { font-size: 0.85rem; color: #9d9db5; font-weight: 400; margin-left: 10px; }
 .claim-card { background: #1a1d2e; border: 1px solid #2e3150; border-radius: 8px;
               padding: 16px 18px; margin-bottom: 14px; border-left: 4px solid #555; }
-.claim-card.TRUE  { border-left-color: #4caf73; }
-.claim-card.FALSE { border-left-color: #e05c5c; }
-.claim-card.MISLEADING  { border-left-color: #e0a84a; }
+.claim-card.TRUE         { border-left-color: #4caf73; }
+.claim-card.FALSE        { border-left-color: #e05c5c; }
+.claim-card.MISLEADING   { border-left-color: #e0a84a; }
 .claim-card.UNVERIFIABLE { border-left-color: #9d9db5; }
 .verdict-badge { display: inline-block; font-size: 0.75rem; font-weight: 700;
                  padding: 3px 10px; border-radius: 20px; margin-bottom: 10px; letter-spacing: 0.5px; }
-.badge-TRUE  { background: #1e3d2a; color: #4caf73; }
-.badge-FALSE { background: #3d1e1e; color: #e05c5c; }
-.badge-MISLEADING { background: #3d2e1e; color: #e0a84a; }
+.badge-TRUE         { background: #1e3d2a; color: #4caf73; }
+.badge-FALSE        { background: #3d1e1e; color: #e05c5c; }
+.badge-MISLEADING   { background: #3d2e1e; color: #e0a84a; }
 .badge-UNVERIFIABLE { background: #2a2d3e; color: #9d9db5; }
 .confidence { font-size: 0.75rem; color: #9d9db5; margin-left: 8px; }
 .claim-text { font-size: 0.95rem; color: #c8c8e0; margin-bottom: 8px; font-style: italic; }
@@ -32,60 +64,130 @@
                margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .citations a:hover { text-decoration: underline; }
 .empty-state { text-align: center; color: #9d9db5; padding: 60px 0; font-size: 0.95rem; }
-.run-btn { display: inline-block; background: #6c63ff; color: white; text-decoration: none;
-           padding: 9px 20px; border-radius: 6px; font-size: 0.9rem; margin-left: auto; }
+
+/* ── Print / PDF styles ── */
+@media print {
+    header, .date-nav, .no-print { display: none !important; }
+    body { background: #fff; color: #111; font-size: 11pt; }
+    .summary-block, .claim-card { background: #fff; border: 1px solid #ccc;
+                                   border-radius: 4px; break-inside: avoid; }
+    .summary-table th, .summary-table td { color: #111; border-bottom: 1px solid #ddd; }
+    .claim-text, .explanation { color: #222; }
+    .politician-header, .section-label { color: #111; border-bottom: 1px solid #aaa; }
+    .st-TRUE        { background: #e6f4ec; color: #1a5c30; }
+    .st-FALSE       { background: #fde8e8; color: #8b1a1a; }
+    .st-MISLEADING  { background: #fdf3e3; color: #7a4a00; }
+    .st-UNVERIFIABLE{ background: #f0f0f0; color: #555; }
+    .badge-TRUE         { background: #e6f4ec; color: #1a5c30; }
+    .badge-FALSE        { background: #fde8e8; color: #8b1a1a; }
+    .badge-MISLEADING   { background: #fdf3e3; color: #7a4a00; }
+    .badge-UNVERIFIABLE { background: #f0f0f0; color: #555; }
+    .claim-card.TRUE         { border-left-color: #2e7d52; }
+    .claim-card.FALSE        { border-left-color: #c0392b; }
+    .claim-card.MISLEADING   { border-left-color: #d4860a; }
+    .claim-card.UNVERIFIABLE { border-left-color: #888; }
+    .source-link, .citations a { color: #3a3aaa; }
+    a { text-decoration: none; }
+    .print-title { display: block !important; }
+}
+.print-title { display: none; font-size: 1.4rem; font-weight: 700;
+               color: #111; margin-bottom: 4px; }
+.print-subtitle { display: none; font-size: 0.9rem; color: #555; margin-bottom: 20px; }
+@media print { .print-subtitle { display: block !important; } }
 {% endblock %}
+
 {% block content %}
-<div class="date-nav">
+
+<!-- Print-only title -->
+<div class="print-title">🔬 PolitiPrism — Fact-Check Digest</div>
+<div class="print-subtitle">{{ date }} &nbsp;|&nbsp; politiprism.app</div>
+
+<!-- Controls -->
+<div class="date-nav no-print">
     <form method="GET" style="display:flex;align-items:center;gap:10px;">
         <input type="date" name="date" value="{{ date }}">
         <button type="submit">Go</button>
     </form>
+    <button class="pdf-btn" onclick="window.print()">⬇ Save PDF</button>
     {% if is_admin %}
         <a href="/admin/run-pipeline" class="run-btn" style="margin-left:auto;">▶ Run Pipeline Now</a>
     {% endif %}
 </div>
 
 {% if results %}
-    {% for group in results %}
-    <div class="politician-block">
-        <div class="politician-header">
-            {{ group.politician.name }}
-            <span>{{ group.politician.role }}</span>
-            <span style="float:right;font-size:0.8rem;">{{ group.claims|length }} claim(s) checked</span>
-        </div>
-        {% for claim in group.claims %}
-        <div class="claim-card {{ claim.verdict }}">
-            <div>
-                <span class="verdict-badge badge-{{ claim.verdict }}">{{ claim.verdict }}</span>
-                <span class="confidence">{{ claim.confidence }} confidence</span>
-            </div>
-            <div class="claim-text">"{{ claim.claim_text }}"</div>
-            <div class="explanation">{{ claim.explanation }}</div>
-            {% if claim.source_url %}
-                <a class="source-link" href="{{ claim.source_url }}" target="_blank">
-                    📰 {{ claim.source_title or claim.source_url }}
-                </a>
-            {% endif %}
-            {% if claim.citations %}
-            <div class="citations">
-                {% for cite in claim.citations[:3] %}
-                    <a href="{{ cite.url }}" target="_blank">🔗 {{ cite.title or cite.url }}</a>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
+
+<!-- ── SUMMARY TABLE ── -->
+<div class="summary-block">
+    <h2>📋 Summary — {{ date }}</h2>
+    <table class="summary-table">
+        <tr>
+            <th>Who</th>
+            <th>Claim</th>
+            <th>Verdict</th>
+            <th>Confidence</th>
+        </tr>
+        {% for group in results %}
+            <tr>
+                <td colspan="4" class="summary-divider">{{ group.politician.name | upper }}</td>
+            </tr>
+            {% for claim in group.claims %}
+            <tr>
+                <td>{{ group.politician.name }}</td>
+                <td>{{ claim.claim_text }}</td>
+                <td><span class="st st-{{ claim.verdict }}">{{ claim.verdict }}</span></td>
+                <td style="color:#9d9db5;font-size:0.8rem;">{{ claim.confidence }}</td>
+            </tr>
+            {% endfor %}
         {% endfor %}
+    </table>
+</div>
+
+<!-- ── DETAIL SECTION ── -->
+<div class="section-label">
+    Detailed Fact-Checks
+    <span>full analysis with sources</span>
+</div>
+
+{% for group in results %}
+<div class="politician-block">
+    <div class="politician-header">
+        {{ group.politician.name }}
+        <span>{{ group.politician.role }}</span>
+        <span style="float:right;font-size:0.8rem;">{{ group.claims|length }} claim(s) checked</span>
     </div>
-    {% endfor %}
-{% else %}
-    <div class="empty-state">
-        <p>No fact-checks found for {{ date }}.</p>
-        {% if is_admin %}
-            <p style="margin-top:12px;">
-                <a href="/admin/run-pipeline" class="run-btn">Run the pipeline now</a>
-            </p>
+    {% for claim in group.claims %}
+    <div class="claim-card {{ claim.verdict }}">
+        <div>
+            <span class="verdict-badge badge-{{ claim.verdict }}">{{ claim.verdict }}</span>
+            <span class="confidence">{{ claim.confidence }} confidence</span>
+        </div>
+        <div class="claim-text">"{{ claim.claim_text }}"</div>
+        <div class="explanation">{{ claim.explanation }}</div>
+        {% if claim.source_url %}
+            <a class="source-link" href="{{ claim.source_url }}" target="_blank">
+                📰 {{ claim.source_title or claim.source_url }}
+            </a>
+        {% endif %}
+        {% if claim.citations %}
+        <div class="citations">
+            {% for cite in claim.citations[:3] %}
+                <a href="{{ cite.url }}" target="_blank">🔗 {{ cite.title or cite.url }}</a>
+            {% endfor %}
+        </div>
         {% endif %}
     </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+{% else %}
+<div class="empty-state">
+    <p>No fact-checks found for {{ date }}.</p>
+    {% if is_admin %}
+        <p style="margin-top:12px;">
+            <a href="/admin/run-pipeline" class="run-btn no-print">Run the pipeline now</a>
+        </p>
+    {% endif %}
+</div>
 {% endif %}
 {% endblock %}
