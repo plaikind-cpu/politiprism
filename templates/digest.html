@@ -110,9 +110,89 @@
     </form>
     <a class="pdf-btn" href="/digest.pdf?date={{ date }}">⬇ Save PDF</a>
     {% if is_admin %}
-        <a href="/admin/run-pipeline" class="run-btn" style="margin-left:auto;">▶ Run Pipeline Now</a>
+        <a href="/admin/run-pipeline" class="run-btn" id="run-btn" style="margin-left:auto;">▶ Run Pipeline Now</a>
     {% endif %}
+    <span id="pipeline-indicator" style="display:none;font-size:0.85rem;color:#e0a84a;margin-left:8px;">
+        ⚙ <span id="pipeline-stage">Running...</span>
+    </span>
+    <span id="pipeline-done" style="display:none;font-size:0.85rem;color:#4caf73;margin-left:8px;">
+        ✓ <span id="pipeline-done-msg"></span>
+    </span>
 </div>
+
+<!-- Pipeline progress bar (digest page) -->
+<div id="pipeline-progress" style="display:none;margin-bottom:20px;" class="no-print">
+    <div style="background:#1a1d2e;border-radius:6px;height:6px;overflow:hidden;border:1px solid #2e3150;">
+        <div id="progress-bar" style="background:#6c63ff;height:100%;width:0%;transition:width 0.5s;"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.78rem;color:#9d9db5;">
+        <span id="progress-label">Statements: 0 / 0</span>
+        <span id="claims-label">Claims found: 0</span>
+    </div>
+</div>
+
+<script>
+(function() {
+    var pollInterval = null;
+    var wasPreviouslyRunning = false;
+
+    function poll() {
+        fetch("/admin/pipeline-status")
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var running = data.running === 1;
+                var runBtn = document.getElementById("run-btn");
+                var indicator = document.getElementById("pipeline-indicator");
+                var doneEl = document.getElementById("pipeline-done");
+                var progressEl = document.getElementById("pipeline-progress");
+                var stageEl = document.getElementById("pipeline-stage");
+                var progressBar = document.getElementById("progress-bar");
+                var progressLabel = document.getElementById("progress-label");
+                var claimsLabel = document.getElementById("claims-label");
+                var doneMsg = document.getElementById("pipeline-done-msg");
+
+                if (runBtn) {
+                    runBtn.style.opacity = running ? "0.4" : "1";
+                    runBtn.style.pointerEvents = running ? "none" : "auto";
+                }
+
+                if (running) {
+                    wasPreviouslyRunning = true;
+                    indicator.style.display = "inline";
+                    doneEl.style.display = "none";
+                    stageEl.textContent = data.stage || "Running...";
+                    var total = data.statements_total || 0;
+                    var done = data.statements_done || 0;
+                    var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+                    if (total > 0) {
+                        progressEl.style.display = "block";
+                        progressBar.style.width = pct + "%";
+                        progressLabel.textContent = "Statements: " + done + " / " + total;
+                        claimsLabel.textContent = "Claims found: " + (data.claims_found || 0);
+                    }
+                } else {
+                    indicator.style.display = "none";
+                    progressEl.style.display = "none";
+                    if (wasPreviouslyRunning) {
+                        // Pipeline just finished — reload page to show new claims
+                        wasPreviouslyRunning = false;
+                        doneEl.style.display = "inline";
+                        doneMsg.textContent = data.stage || "Complete";
+                        clearInterval(pollInterval);
+                        setTimeout(function() { window.location.reload(); }, 2000);
+                    } else if (data.claims_found > 0) {
+                        doneEl.style.display = "inline";
+                        doneMsg.textContent = data.stage || "Complete";
+                    }
+                }
+            })
+            .catch(function() {});
+    }
+
+    poll();
+    pollInterval = setInterval(poll, 3000);
+})();
+</script>
 
 {% if results %}
 
