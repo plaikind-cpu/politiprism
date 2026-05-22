@@ -88,4 +88,33 @@ td { padding: 8px 10px; border-bottom: 1px solid #1e2135; color: #c8c8e0; vertic
     <a href="/admin/run-pipeline" class="action-link" style="font-size:0.95rem;">▶ Run Pipeline Now</a>
 </div>
 
+<div class="section">
+    <h2>Clear Data</h2>
+    <p style="color:#9d9db5;font-size:0.88rem;margin-bottom:16px;">
+        Politicians and users are always preserved. Only claims and statements are removed.
+    </p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;">
+        <div>
+            <form method="GET" action="/admin/clear-today" style="display:flex;gap:8px;align-items:center;">
+                <input type="date" name="date" id="clear-date"
+                       style="background:#0f1117;border:1px solid #3a3d5c;color:#e0e0e0;
+                              padding:7px 10px;border-radius:6px;font-size:0.85rem;"
+                       value="{{ today }}">
+                <button type="submit"
+                        onclick="return confirm('Clear all claims and statements for this date?')"
+                        style="background:#3d2e1e;color:#e0a84a;border:1px solid #e0a84a;
+                               padding:8px 16px;border-radius:6px;cursor:pointer;font-size:0.85rem;">
+                    🗓 Clear Selected Date
+                </button>
+            </form>
+        </div>
+        <a href="/admin/clear-all"
+           onclick="return confirm('Clear ALL claims and statements? This cannot be undone.')"
+           style="background:#3d1e1e;color:#e05c5c;border:1px solid #e05c5c;
+                  padding:8px 16px;border-radius:6px;font-size:0.85rem;text-decoration:none;">
+            🗑 Clear Everything
+        </a>
+    </div>
+</div>
+
 {% endblock %}

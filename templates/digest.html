@@ -108,7 +108,7 @@
         <input type="date" name="date" value="{{ date }}">
         <button type="submit">Go</button>
     </form>
-    <button class="pdf-btn" onclick="window.print()">⬇ Save PDF</button>
+    <a class="pdf-btn" href="/digest.pdf?date={{ date }}">⬇ Save PDF</a>
     {% if is_admin %}
         <a href="/admin/run-pipeline" class="run-btn" style="margin-left:auto;">▶ Run Pipeline Now</a>
     {% endif %}
