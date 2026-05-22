@@ -1,6 +1,5 @@
 import os
 import json
-import requests
 import anthropic
 from models import get_db
 from ingestion import brave_news_search
@@ -21,11 +20,12 @@ STRICT RULES:
 - Do NOT include actions taken by the administration, policy changes, or things that happened TO {politician_name}
 - Do NOT include statements by aides, officials, or spokespeople on behalf of {politician_name}
 - Do NOT include reporter paraphrases of general policy — only direct attribution of spoken/written words
-- Each claim must be a specific, checkable factual assertion (not an opinion or prediction)
+- Each claim must be a specific, checkable factual assertion (not an opinion, prediction, or value judgment)
+- Strip out the attribution prefix — return only the substance of the claim itself
 - If no qualifying direct statements exist in the text, return an empty array []
 
 Return ONLY a JSON array of claim strings. No preamble, no markdown, no explanation.
-Example: ["Trump said the trade deficit has been cut by half", "Trump claimed tariffs brought in $200 billion"]
+Example: ["The trade deficit has been cut by half", "Tariffs have brought in $200 billion in revenue"]
 
 Text:
 {statement_text}"""
@@ -44,7 +44,37 @@ Text:
         print(f"Claim extraction error: {e}")
         return []
 
-# ── Step 2: Verify a single claim via Brave Search ───────────────────────────
+# ── Step 1b: Deduplicate claims against those already checked today ───────────
+
+def is_duplicate_claim(claim_text, politician_id, date_str):
+    """Return True if a semantically similar claim was already checked today."""
+    conn = get_db()
+    existing = conn.execute("""
+        SELECT c.claim_text FROM claims c
+        JOIN statements s ON c.statement_id = s.id
+        WHERE s.politician_id = ? AND DATE(c.checked_at) = ?
+    """, (politician_id, date_str)).fetchall()
+    conn.close()
+
+    if not existing:
+        return False
+
+    existing_texts = [r["claim_text"].lower().strip() for r in existing]
+    claim_lower = claim_text.lower().strip()
+
+    # Exact or near-exact match (handles minor phrasing variants)
+    for ex in existing_texts:
+        # Check significant word overlap (>70% of words shared)
+        claim_words = set(claim_lower.split())
+        ex_words = set(ex.split())
+        if len(claim_words) == 0:
+            continue
+        overlap = len(claim_words & ex_words) / len(claim_words)
+        if overlap > 0.70:
+            return True
+    return False
+
+# ── Step 2: Search for evidence about the claim ──────────────────────────────
 
 def search_for_claim(claim_text):
     results = brave_news_search(claim_text[:120])
@@ -57,35 +87,42 @@ def search_for_claim(claim_text):
         })
     return snippets
 
-# ── Step 3: Render a verdict given claim + evidence ──────────────────────────
+# ── Step 3: Fact-check the substance of the claim ───────────────────────────
 
 def render_verdict(claim_text, politician_name, evidence):
     evidence_block = "\n".join([
         f"- [{e['title']}]({e['url']}): {e['snippet']}" for e in evidence
     ])
 
-    prompt = f"""You are a rigorous, nonpartisan fact-checker.
+    prompt = f"""You are a rigorous, nonpartisan fact-checker evaluating whether a claim is factually accurate.
 
-Claim (attributed to {politician_name}):
+{politician_name} made the following claim:
 "{claim_text}"
 
-Evidence from news sources:
+Your job is to evaluate whether the SUBSTANCE of this claim is TRUE or FALSE — not whether {politician_name} said it (assume they did). Focus entirely on whether the factual assertion itself is accurate.
+
+Evidence from independent news sources:
 {evidence_block if evidence_block else "No supporting evidence found."}
 
-Evaluate the claim and respond ONLY with a JSON object in this exact format:
+Respond ONLY with a JSON object in this exact format:
 {{
   "verdict": "TRUE" | "FALSE" | "MISLEADING" | "UNVERIFIABLE",
   "confidence": "HIGH" | "MEDIUM" | "LOW",
-  "explanation": "2-3 sentence explanation citing specific evidence",
+  "explanation": "2-3 sentences evaluating the factual accuracy of the claim itself, citing specific evidence that supports or contradicts it",
   "citations": [
     {{"title": "...", "url": "...", "snippet": "..."}}
   ]
 }}
 
+Verdict definitions:
+- TRUE = the factual assertion is accurate based on available evidence
+- FALSE = the factual assertion contradicts available evidence
+- MISLEADING = technically accurate but omits critical context that changes its meaning
+- UNVERIFIABLE = insufficient independent evidence to confirm or deny the factual claim
+
 Rules:
-- Be strictly factual. Do not inject political opinion.
-- UNVERIFIABLE = not enough evidence to confirm or deny
-- MISLEADING = technically true but missing important context
+- Never evaluate whether {politician_name} made the statement — assume they did
+- Be strictly factual. No political opinion.
 - Citations must only come from the evidence provided above
 - No preamble, no markdown fences, just the JSON object"""
 
@@ -109,8 +146,10 @@ Rules:
 
 # ── Step 4: Full pipeline for one statement ──────────────────────────────────
 
-def process_statement(statement):
+def process_statement(statement, date_str):
+    from datetime import datetime
     statement_id = statement["id"]
+    politician_id = statement["politician_id"]
     politician_name = statement["politician_name"]
     raw_text = statement["raw_text"]
 
@@ -119,7 +158,12 @@ def process_statement(statement):
     print(f"  Found {len(claims)} claims")
 
     conn = get_db()
+    added = 0
     for claim_text in claims:
+        if is_duplicate_claim(claim_text, politician_id, date_str):
+            print(f"    [SKIP duplicate] {claim_text[:60]}...")
+            continue
+
         print(f"    Checking: {claim_text[:80]}...")
         evidence = search_for_claim(claim_text)
         verdict_data = render_verdict(claim_text, politician_name, evidence)
@@ -136,6 +180,8 @@ def process_statement(statement):
             verdict_data.get("explanation", ""),
             json.dumps(verdict_data.get("citations", []))
         ))
+        conn.commit()  # Commit after each claim so dedup sees it immediately
+        added += 1
 
-    conn.commit()
     conn.close()
+    print(f"  Added {added} unique claims")

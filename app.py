@@ -132,6 +132,43 @@ def digest():
 
 # ── Admin panel ───────────────────────────────────────────────────────────────
 
+
+# PDF export
+@app.route("/digest.pdf")
+@require_login
+def digest_pdf():
+    from weasyprint import HTML
+    from flask import Response
+    date_str = request.args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    conn = get_db()
+    politicians = conn.execute("SELECT * FROM politicians WHERE active = 1").fetchall()
+    results = []
+    for pol in politicians:
+        claims = conn.execute("""
+            SELECT c.*, s.source_url, s.source_title
+            FROM claims c
+            JOIN statements s ON c.statement_id = s.id
+            WHERE s.politician_id = ? AND DATE(c.checked_at) = ?
+            ORDER BY c.checked_at DESC
+        """, (pol["id"], date_str)).fetchall()
+        if claims:
+            results.append({"politician": pol, "claims": [dict(c) for c in claims]})
+    conn.close()
+    for group in results:
+        for claim in group["claims"]:
+            try:
+                claim["citations"] = json.loads(claim["citations"] or "[]")
+            except:
+                claim["citations"] = []
+    html_str = render_template("digest_pdf.html", results=results, date=date_str, now=datetime.utcnow().strftime("%B %d, %Y %H:%M UTC"))
+    pdf_bytes = HTML(string=html_str, base_url=request.host_url).write_pdf()
+    filename = f"PolitiPrism_{date_str}.pdf"
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @app.route("/admin")
 @require_login
 def admin():
@@ -141,7 +178,8 @@ def admin():
     politicians = conn.execute("SELECT * FROM politicians ORDER BY name").fetchall()
     users = conn.execute("SELECT * FROM users ORDER BY email").fetchall()
     conn.close()
-    return render_template("admin.html", politicians=politicians, users=users)
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    return render_template("admin.html", politicians=politicians, users=users, today=today)
 
 @app.route("/admin/politician/add", methods=["POST"])
 @require_login
@@ -210,6 +248,44 @@ def trigger_pipeline():
     import threading
     threading.Thread(target=run_daily_pipeline, daemon=True).start()
     flash("Pipeline started — check Railway logs for progress.")
+    return redirect(url_for("admin"))
+
+
+# ── Clear data (admin only) ───────────────────────────────────────────────────
+
+@app.route("/admin/clear-today")
+@require_login
+def clear_today():
+    if not is_admin():
+        return "Access denied.", 403
+    date_str = request.args.get("date", datetime.utcnow().strftime("%Y-%m-%d"))
+    conn = get_db()
+    # Delete claims for today
+    conn.execute("""
+        DELETE FROM claims WHERE id IN (
+            SELECT c.id FROM claims c
+            JOIN statements s ON c.statement_id = s.id
+            WHERE DATE(c.checked_at) = ?
+        )
+    """, (date_str,))
+    # Delete statements fetched today and reset processed flag
+    conn.execute("DELETE FROM statements WHERE DATE(fetched_at) = ?", (date_str,))
+    conn.commit()
+    conn.close()
+    flash(f"Cleared all data for {date_str}. Run the pipeline to re-fetch.")
+    return redirect(url_for("admin"))
+
+@app.route("/admin/clear-all")
+@require_login
+def clear_all():
+    if not is_admin():
+        return "Access denied.", 403
+    conn = get_db()
+    conn.execute("DELETE FROM claims")
+    conn.execute("DELETE FROM statements")
+    conn.commit()
+    conn.close()
+    flash("All claims and statements cleared. Politicians and users preserved.")
     return redirect(url_for("admin"))
 
 # ── Startup ───────────────────────────────────────────────────────────────────

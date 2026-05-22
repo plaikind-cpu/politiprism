@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from apscheduler.schedulers.background import BackgroundScheduler
 from models import get_db
 from ingestion import fetch_statements_for_politician, get_unprocessed_statements, mark_statement_processed
@@ -6,6 +7,7 @@ import atexit
 
 def run_daily_pipeline():
     print("=== PolitiPrism daily pipeline starting ===")
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # 1. Fetch news for all active politicians
     conn = get_db()
@@ -25,7 +27,7 @@ def run_daily_pipeline():
 
     for statement in statements:
         try:
-            process_statement(statement)
+            process_statement(statement, date_str)
             mark_statement_processed(statement["id"])
         except Exception as e:
             print(f"  Error processing statement {statement['id']}: {e}")
@@ -34,7 +36,6 @@ def run_daily_pipeline():
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    # Run every day at 7:00 AM UTC (midnight Pacific)
     scheduler.add_job(run_daily_pipeline, "cron", hour=7, minute=0)
     scheduler.start()
     atexit.register(lambda: scheduler.shutdown())
