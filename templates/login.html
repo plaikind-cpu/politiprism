@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}PolitiPrism — Login{% endblock %}
+{% block extra_styles %}
+.login-box { max-width: 400px; margin: 80px auto; background: #1a1d2e;
+             border: 1px solid #2e3150; border-radius: 10px; padding: 36px; text-align: center; }
+.login-box h2 { color: #c8bfff; margin-bottom: 10px; }
+.login-box p { color: #9d9db5; font-size: 0.9rem; margin-bottom: 24px; }
+input[type=email] { width: 100%; padding: 10px 14px; border-radius: 6px;
+                    border: 1px solid #3a3d5c; background: #0f1117; color: #e0e0e0;
+                    font-size: 1rem; margin-bottom: 14px; }
+button { width: 100%; padding: 11px; background: #6c63ff; color: white;
+         border: none; border-radius: 6px; font-size: 1rem; cursor: pointer; }
+button:hover { background: #7c73ff; }
+{% endblock %}
+{% block content %}
+<div class="login-box">
+    <h2>PolitiPrism</h2>
+    <p>Invitation-only political fact-checker.<br>Enter your email for a magic link.</p>
+    <form method="POST">
+        <input type="email" name="email" placeholder="your@email.com" required autofocus>
+        <button type="submit">Send Magic Link</button>
+    </form>
+</div>
+{% endblock %}

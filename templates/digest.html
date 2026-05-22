@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}PolitiPrism — Daily Digest{% endblock %}
+{% block extra_styles %}
+.date-nav { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+.date-nav input[type=date] { background: #1a1d2e; border: 1px solid #3a3d5c;
+                              color: #e0e0e0; padding: 7px 12px; border-radius: 6px; font-size: 0.95rem; }
+.date-nav button { background: #6c63ff; color: white; border: none;
+                   padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+.politician-block { margin-bottom: 40px; }
+.politician-header { font-size: 1.2rem; font-weight: 600; color: #c8bfff;
+                     border-bottom: 1px solid #2e3150; padding-bottom: 8px; margin-bottom: 16px; }
+.politician-header span { font-size: 0.85rem; color: #9d9db5; font-weight: 400; margin-left: 10px; }
+.claim-card { background: #1a1d2e; border: 1px solid #2e3150; border-radius: 8px;
+              padding: 16px 18px; margin-bottom: 14px; border-left: 4px solid #555; }
+.claim-card.TRUE  { border-left-color: #4caf73; }
+.claim-card.FALSE { border-left-color: #e05c5c; }
+.claim-card.MISLEADING  { border-left-color: #e0a84a; }
+.claim-card.UNVERIFIABLE { border-left-color: #9d9db5; }
+.verdict-badge { display: inline-block; font-size: 0.75rem; font-weight: 700;
+                 padding: 3px 10px; border-radius: 20px; margin-bottom: 10px; letter-spacing: 0.5px; }
+.badge-TRUE  { background: #1e3d2a; color: #4caf73; }
+.badge-FALSE { background: #3d1e1e; color: #e05c5c; }
+.badge-MISLEADING { background: #3d2e1e; color: #e0a84a; }
+.badge-UNVERIFIABLE { background: #2a2d3e; color: #9d9db5; }
+.confidence { font-size: 0.75rem; color: #9d9db5; margin-left: 8px; }
+.claim-text { font-size: 0.95rem; color: #c8c8e0; margin-bottom: 8px; font-style: italic; }
+.explanation { font-size: 0.88rem; color: #b0b0c8; margin-bottom: 10px; line-height: 1.5; }
+.source-link { font-size: 0.8rem; color: #6c63ff; text-decoration: none; }
+.source-link:hover { text-decoration: underline; }
+.citations { margin-top: 8px; }
+.citations a { display: block; font-size: 0.8rem; color: #7c73cc; text-decoration: none;
+               margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.citations a:hover { text-decoration: underline; }
+.empty-state { text-align: center; color: #9d9db5; padding: 60px 0; font-size: 0.95rem; }
+.run-btn { display: inline-block; background: #6c63ff; color: white; text-decoration: none;
+           padding: 9px 20px; border-radius: 6px; font-size: 0.9rem; margin-left: auto; }
+{% endblock %}
+{% block content %}
+<div class="date-nav">
+    <form method="GET" style="display:flex;align-items:center;gap:10px;">
+        <input type="date" name="date" value="{{ date }}">
+        <button type="submit">Go</button>
+    </form>
+    {% if is_admin %}
+        <a href="/admin/run-pipeline" class="run-btn" style="margin-left:auto;">▶ Run Pipeline Now</a>
+    {% endif %}
+</div>
+
+{% if results %}
+    {% for group in results %}
+    <div class="politician-block">
+        <div class="politician-header">
+            {{ group.politician.name }}
+            <span>{{ group.politician.role }}</span>
+            <span style="float:right;font-size:0.8rem;">{{ group.claims|length }} claim(s) checked</span>
+        </div>
+        {% for claim in group.claims %}
+        <div class="claim-card {{ claim.verdict }}">
+            <div>
+                <span class="verdict-badge badge-{{ claim.verdict }}">{{ claim.verdict }}</span>
+                <span class="confidence">{{ claim.confidence }} confidence</span>
+            </div>
+            <div class="claim-text">"{{ claim.claim_text }}"</div>
+            <div class="explanation">{{ claim.explanation }}</div>
+            {% if claim.source_url %}
+                <a class="source-link" href="{{ claim.source_url }}" target="_blank">
+                    📰 {{ claim.source_title or claim.source_url }}
+                </a>
+            {% endif %}
+            {% if claim.citations %}
+            <div class="citations">
+                {% for cite in claim.citations[:3] %}
+                    <a href="{{ cite.url }}" target="_blank">🔗 {{ cite.title or cite.url }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="empty-state">
+        <p>No fact-checks found for {{ date }}.</p>
+        {% if is_admin %}
+            <p style="margin-top:12px;">
+                <a href="/admin/run-pipeline" class="run-btn">Run the pipeline now</a>
+            </p>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}

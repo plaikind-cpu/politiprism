@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}PolitiPrism — Admin{% endblock %}
+{% block extra_styles %}
+.section { background: #1a1d2e; border: 1px solid #2e3150; border-radius: 8px;
+           padding: 22px; margin-bottom: 28px; }
+.section h2 { color: #c8bfff; font-size: 1rem; margin-bottom: 16px;
+              border-bottom: 1px solid #2e3150; padding-bottom: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th { text-align: left; color: #9d9db5; padding: 6px 10px; border-bottom: 1px solid #2e3150; }
+td { padding: 8px 10px; border-bottom: 1px solid #1e2135; color: #c8c8e0; vertical-align: top; }
+.badge-active   { color: #4caf73; font-size: 0.8rem; }
+.badge-inactive { color: #9d9db5; font-size: 0.8rem; }
+.action-link { color: #6c63ff; text-decoration: none; font-size: 0.8rem; }
+.action-link:hover { text-decoration: underline; }
+.form-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.form-row input { flex: 1; min-width: 140px; background: #0f1117; border: 1px solid #3a3d5c;
+                  color: #e0e0e0; padding: 8px 12px; border-radius: 6px; font-size: 0.88rem; }
+.form-row button { background: #6c63ff; color: white; border: none;
+                   padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 0.88rem; }
+{% endblock %}
+{% block content %}
+
+<div class="section">
+    <h2>Tracked Politicians</h2>
+    <table>
+        <tr>
+            <th>Name</th><th>Role</th><th>Search Terms</th><th>Status</th><th></th>
+        </tr>
+        {% for pol in politicians %}
+        <tr>
+            <td>{{ pol.name }}</td>
+            <td>{{ pol.role }}</td>
+            <td style="color:#9d9db5;font-size:0.8rem;">{{ pol.search_terms }}</td>
+            <td>
+                {% if pol.active %}
+                    <span class="badge-active">● Active</span>
+                {% else %}
+                    <span class="badge-inactive">○ Paused</span>
+                {% endif %}
+            </td>
+            <td>
+                <a class="action-link" href="/admin/politician/toggle/{{ pol.id }}">
+                    {% if pol.active %}Pause{% else %}Activate{% endif %}
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <form method="POST" action="/admin/politician/add">
+        <div class="form-row">
+            <input name="name" placeholder="Name" required>
+            <input name="role" placeholder="Role / Title">
+            <input name="search_terms" placeholder="Search terms (comma-separated)" required style="flex:2;">
+            <button type="submit">Add</button>
+        </div>
+    </form>
+</div>
+
+<div class="section">
+    <h2>Invited Users</h2>
+    <table>
+        <tr><th>Email</th><th>Added</th><th></th></tr>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.email }}</td>
+            <td style="color:#9d9db5;font-size:0.8rem;">{{ user.created_at[:10] }}</td>
+            <td>
+                {% if user.email != session.user_email %}
+                    <a class="action-link" href="/admin/user/remove/{{ user.id }}">Remove</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <form method="POST" action="/admin/user/add">
+        <div class="form-row">
+            <input type="email" name="email" placeholder="new@email.com" required>
+            <button type="submit">Invite</button>
+        </div>
+    </form>
+</div>
+
+<div class="section">
+    <h2>Pipeline</h2>
+    <p style="color:#9d9db5;font-size:0.88rem;margin-bottom:14px;">
+        Scheduled daily at 7:00 AM UTC. Run manually anytime.
+    </p>
+    <a href="/admin/run-pipeline" class="action-link" style="font-size:0.95rem;">▶ Run Pipeline Now</a>
+</div>
+
+{% endblock %}
