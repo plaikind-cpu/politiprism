@@ -12,14 +12,20 @@ MODEL = "claude-sonnet-4-20250514"
 # ── Step 1: Extract discrete verifiable claims from a statement ──────────────
 
 def extract_claims(statement_text, politician_name):
-    prompt = f"""You are analyzing a news excerpt about {politician_name}.
+    prompt = f"""You are analyzing a news excerpt for direct spoken statements by {politician_name}.
 
-Extract every discrete, verifiable factual claim attributed to {politician_name} in the text below.
-Only include claims that are specific and checkable (statistics, historical assertions, policy claims, cause-effect claims).
-Exclude vague opinions, predictions, or rhetorical statements.
+Your task: extract only verifiable factual claims that {politician_name} personally SAID, STATED, or CLAIMED out loud — in a speech, interview, press conference, social media post, or direct quote.
+
+STRICT RULES:
+- Only include claims where the text explicitly attributes the words to {politician_name} speaking (e.g. "Trump said...", "Trump claimed...", "Trump told reporters...", "Trump posted...", "according to Trump...")
+- Do NOT include actions taken by the administration, policy changes, or things that happened TO {politician_name}
+- Do NOT include statements by aides, officials, or spokespeople on behalf of {politician_name}
+- Do NOT include reporter paraphrases of general policy — only direct attribution of spoken/written words
+- Each claim must be a specific, checkable factual assertion (not an opinion or prediction)
+- If no qualifying direct statements exist in the text, return an empty array []
 
 Return ONLY a JSON array of claim strings. No preamble, no markdown, no explanation.
-Example: ["Claim 1", "Claim 2"]
+Example: ["Trump said the trade deficit has been cut by half", "Trump claimed tariffs brought in $200 billion"]
 
 Text:
 {statement_text}"""
