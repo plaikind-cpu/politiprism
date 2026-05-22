@@ -24,6 +24,7 @@ REJECT anything that is:
 - A hypothetical or rhetorical statement ("if Jesus was counting the votes...")
 - A vague or unmeasurable assertion ("we're doing great", "the best ever")
 - A statement by administration officials, aides, or spokespeople — only {politician_name} directly
+- A fact ABOUT {politician_name} reported by journalists (poll numbers about them, their approval ratings, economic stats about their performance) — only facts {politician_name} themselves asserted
 - Something already in the list below (avoid duplicates)
 
 GOOD examples of checkable claims:
