@@ -89,10 +89,11 @@ def init_db():
     conn.close()
 
 def seed_politicians(c):
+    # search_terms used only for Brave News secondary source
     defaults = [
-        ("Donald Trump", "President", 'Trump said,Trump claims,Trump told reporters,Trump declared,Trump announced'),
-        ("JD Vance", "Vice President", 'Vance said,Vance claims,Vance told reporters,Vance declared'),
-        ("Marco Rubio", "Secretary of State", 'Rubio said,Rubio claims,Rubio told reporters,Rubio stated'),
+        ("Donald Trump", "President", "Trump told reporters,Trump said in a speech,Trump said at a press conference"),
+        ("JD Vance", "Vice President", "Vance told reporters,Vance said in a speech,Vance said at a press conference"),
+        ("Marco Rubio", "Secretary of State", "Rubio told reporters,Rubio said in a speech,Rubio said at a press conference"),
     ]
     for name, role, terms in defaults:
         c.execute(
