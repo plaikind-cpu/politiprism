@@ -90,9 +90,9 @@ def init_db():
 
 def seed_politicians(c):
     defaults = [
-        ("Donald Trump", "President", '"Trump said","Trump claims","Trump told reporters","Trump posted","Trump announced he","Trump declared'),
-        ("JD Vance", "Vice President", '"Vance said","Vance claims","Vance told reporters","Vance posted'),
-        ("Marco Rubio", "Secretary of State", '"Rubio said","Rubio claims","Rubio told reporters","Rubio stated'),
+        ("Donald Trump", "President", 'Trump said,Trump claims,Trump told reporters,Trump declared,Trump announced'),
+        ("JD Vance", "Vice President", 'Vance said,Vance claims,Vance told reporters,Vance declared'),
+        ("Marco Rubio", "Secretary of State", 'Rubio said,Rubio claims,Rubio told reporters,Rubio stated'),
     ]
     for name, role, terms in defaults:
         c.execute(
