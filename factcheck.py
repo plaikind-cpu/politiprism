@@ -227,11 +227,13 @@ Verdict definitions:
 # ── Full pipeline for one statement ──────────────────────────────────────────
 
 def process_statement(statement, date_str):
+    # Convert sqlite3.Row to plain dict so .get() works throughout
+    statement = dict(statement)
     statement_id   = statement["id"]
     politician_id  = statement["politician_id"]
     politician_name = statement["politician_name"]
     raw_text       = statement["raw_text"]
-    source_url     = statement.get("source_url", "")
+    source_url     = statement.get("source_url", "") or ""
 
     # Determine source type for groundability check
     if "whitehouse.gov" in source_url:

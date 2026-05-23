@@ -33,6 +33,9 @@ def fetch_wh_remarks_today(politician):
             params={"slug": "remarks", "per_page": 5},
             headers=HEADERS, timeout=10
         )
+        if not cat_resp.text.strip():
+            print("  WH API: empty response")
+            return 0
         cats = cat_resp.json()
         if not cats:
             print("  WH API: remarks category not found")
