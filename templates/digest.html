@@ -245,7 +245,13 @@
         <div class="explanation">{{ claim.explanation }}</div>
         {% if claim.source_url %}
             <a class="source-link" href="{{ claim.source_url }}" target="_blank">
-                📰 {{ claim.source_title or claim.source_url }}
+                {% if "trumpstruth" in claim.source_url %}
+                    🐦 Truth Social — {{ claim.source_title or "" }}
+                {% elif "whitehouse.gov" in claim.source_url %}
+                    🏛 White House Transcript — {{ claim.source_title or "" }}
+                {% else %}
+                    📰 {{ claim.source_title or claim.source_url }}
+                {% endif %}
             </a>
         {% endif %}
         {% if claim.citations %}
