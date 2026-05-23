@@ -275,10 +275,18 @@ def digest_pdf():
             pdf.multi_cell(0, 5, safe(claim.get("explanation", "")))
 
             # Source
-            if claim.get("source_title"):
+            if claim.get("source_title") or claim.get("source_url"):
                 pdf.set_font("Helvetica", "", 7.5)
                 pdf.set_text_color(80, 80, 180)
-                pdf.cell(0, 5, safe(f"Source: {claim['source_title']}"), ln=True)
+                src = claim.get("source_title") or claim.get("source_url") or ""
+                # Label Truth Social vs news
+                if "Truth Social" in src or "trumpstruth" in (claim.get("source_url") or ""):
+                    src_label = f"Source: Truth Social — {src[:80]}"
+                elif "whitehouse.gov" in (claim.get("source_url") or ""):
+                    src_label = f"Source: White House Transcript"
+                else:
+                    src_label = f"Source: {src[:80]}"
+                pdf.cell(0, 5, safe(src_label), ln=True)
 
             # Citations
             for cite in claim.get("citations", [])[:2]:

@@ -135,7 +135,13 @@ Rules:
 - "The best ever" or "nobody has done more" = opinion unless it names a specific measurable metric.
 - Statistical claims must include an actual number to be verifiable.
 - "We have the best economy" = opinion, reject.
-- "Unemployment is 3.9%" = statistical_claim, verifiable."""
+- "Unemployment is 3.9%" = statistical_claim, verifiable.
+- Election results, vote tallies, legislative votes, and public records ARE verifiable even without a specific number.
+- For search_query: be specific and factual. Use the actual names, numbers, and topics in the claim.
+  Example: "Trump won North Carolina 6 times" → search_query: "Trump North Carolina election results primaries wins"
+  Example: "Trump $10 billion IRS lawsuit settlement" → search_query: "Trump IRS lawsuit 10 billion settlement dropped"
+  Example: "Kyle Busch NASCAR all time wins record" → search_query: "Kyle Busch NASCAR wins all time record"
+- Never use vague search queries like "fact check Trump statement" — always include the specific subject matter."""
 
     try:
         raw = call_claude(prompt, max_tokens=300)
@@ -190,9 +196,12 @@ def render_verdict(claim_text, politician_name, evidence):
 
 {politician_name} stated: "{claim_text}"
 
-Evaluate whether this factual assertion is accurate.
-Do NOT evaluate whether {politician_name} said it — assume they did.
-Focus ONLY on whether the underlying facts are correct.
+Your ONLY job: evaluate the factual accuracy of the assertion itself.
+ASSUME the person said it — do not comment on whether they said it.
+Do NOT confirm or deny who made the statement.
+Do NOT start your explanation with "Trump stated" or "The claim is that".
+START your explanation with what the evidence shows about the underlying facts.
+Focus entirely on whether the substance of the claim is TRUE or FALSE.
 
 Evidence:
 {evidence_block}
@@ -211,10 +220,15 @@ Citation rules:
 - If no source directly addresses the claim, return empty citations array
 
 Verdict definitions:
-- TRUE = evidence confirms the assertion
+- TRUE = evidence confirms the assertion is factually accurate
 - FALSE = evidence contradicts the assertion
-- MISLEADING = technically accurate but missing critical context
-- UNVERIFIABLE = insufficient independent evidence"""
+- MISLEADING = technically accurate but omits critical context that materially changes the meaning
+  (e.g. claiming credit for settling a lawsuit without noting the outcome was uncertain)
+- UNVERIFIABLE = insufficient independent evidence to confirm or deny
+
+When using UNVERIFIABLE: first search your own knowledge before defaulting to it.
+If the claim is about a well-documented public record (elections, legislation, lawsuits, sports records),
+prefer TRUE/FALSE/MISLEADING over UNVERIFIABLE even if the provided evidence snippets are thin."""
 
     try:
         raw = call_claude(prompt, max_tokens=600)
