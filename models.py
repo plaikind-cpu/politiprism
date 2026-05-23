@@ -80,6 +80,21 @@ def init_db():
     # Ensure the singleton row exists
     c.execute("INSERT OR IGNORE INTO pipeline_status (id) VALUES (1)")
 
+    # Claim registry — deduplication and caching across runs
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS claim_registry (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            claim_fingerprint TEXT UNIQUE,
+            raw_quote TEXT,
+            search_query TEXT,
+            verdict TEXT,
+            verdict_summary TEXT,
+            first_seen DATE DEFAULT (date('now')),
+            last_seen DATE DEFAULT (date('now')),
+            occurrence_count INTEGER DEFAULT 1
+        )
+    """)
+
     # Seed default politicians if table is empty
     c.execute("SELECT COUNT(*) FROM politicians")
     if c.fetchone()[0] == 0:

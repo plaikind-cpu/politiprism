@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import anthropic
 from models import get_db
@@ -8,103 +9,177 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 MODEL = "claude-sonnet-4-20250514"
 
-# ── Step 1: Extract discrete verifiable claims ───────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
-def extract_claims(statement_text, politician_name):
-    prompt = f"""You are a strict filter extracting only fact-checkable claims from news text about {politician_name}.
+def call_claude(prompt, max_tokens=800):
+    resp = client.messages.create(
+        model=MODEL,
+        max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    raw = resp.content[0].text.strip()
+    return raw.replace("```json", "").replace("```", "").strip()
 
-A fact-checkable claim must meet ALL of these criteria:
-1. Directly attributed to {politician_name} speaking or writing (quoted or paraphrased from their words)
-2. A specific factual assertion about the real world — something that is objectively TRUE or FALSE
-3. Checkable against independent evidence (statistics, historical facts, documented events, scientific consensus)
+def fingerprint(text):
+    """Normalize a claim string for deduplication."""
+    return re.sub(r'[^a-z0-9 ]', '', text.lower().strip())
 
-REJECT anything that is:
-- An opinion, value judgment, or characterization ("it's a disaster", "it's a disgrace", "I'd be happy to do it")
-- A future intention or promise ("I will send troops", "we're going to build")
-- A hypothetical or rhetorical statement ("if Jesus was counting the votes...")
-- A vague or unmeasurable assertion ("we're doing great", "the best ever")
-- A statement by administration officials, aides, or spokespeople — only {politician_name} directly
-- A fact ABOUT {politician_name} reported by journalists (approval ratings, poll numbers, economic stats) — only facts {politician_name} themselves asserted
-- An accusation about a THIRD PARTY's voting record, character, or behavior ("Congressman X voted against Y", "Senator Z endorsed Biden") — these are political attacks, not verifiable world facts
-- A political endorsement, campaign attack, or partisan characterization of any person or party
-- Something already in the list below (avoid duplicates)
+# ── Change 1: Groundability pre-filter ───────────────────────────────────────
 
-GOOD examples of checkable claims — {politician_name} asserting facts about the world:
-- "The US trade deficit with China is $500 billion" (specific measurable economic fact)
-- "NATO members agreed to 5% GDP spending at the last summit" (documented international event)
-- "The 14th Amendment has guaranteed birthright citizenship since 1868" (verifiable historical fact)
-- "We have 80,000 troops stationed in Europe" (specific military fact)
-- "The Energy Committee voted 48-1 on this bill" (documented legislative fact)
+def is_groundable_source(source_text, source_type):
+    """
+    Returns True only if the source contains direct verbatim quotes
+    from the politician. Skips paraphrased news articles.
+    """
+    # WH transcripts and Truth Social are always direct quotes
+    if source_type in ("wh_transcript", "truth_social"):
+        return True
 
-BAD examples (reject all of these):
-- "Congressman X voted against our tax cuts" (accusation about third party)
-- "Senator Y endorsed Biden" (political attack on third party)
-- "I'd be happy to do it" (intention/opinion)
-- "Colbert is finally finished" (characterization)
-- "We have total control" (vague, unmeasurable)
-- "No American leader has done this in 50 years" (vague)
-- "He would have won California if Jesus was counting" (hypothetical)
-- "She's a crooked politician" (opinion/attack)
+    prompt = f"""You are evaluating whether a text source contains direct, verbatim or 
+near-verbatim quotations attributed to Donald Trump — words he actually spoke or wrote.
 
-Return ONLY a JSON array of claim strings — just the factual substance, no attribution prefix.
-If no qualifying claims exist, return [].
-No preamble, no markdown, no explanation.
+Source type: {source_type}
+Source text: {source_text[:3000]}
 
-Text to analyze:
-{statement_text}"""
+Return JSON only:
+{{
+  "contains_direct_quotes": true or false,
+  "confidence": "high" or "medium" or "low",
+  "reason": "one sentence explanation"
+}}
+
+Rules:
+- News articles that only paraphrase or summarize do NOT contain direct quotes.
+- News articles with a blockquoted or quoted passage DO contain direct quotes.
+- If confidence is "low", treat as false."""
 
     try:
-        resp = client.messages.create(
-            model=MODEL,
-            max_tokens=800,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        raw = resp.content[0].text.strip()
-        raw = raw.replace("```json", "").replace("```", "").strip()
-        claims = json.loads(raw)
-        return [c for c in claims if isinstance(c, str) and len(c) > 15]
+        raw = call_claude(prompt, max_tokens=200)
+        data = json.loads(raw)
+        if data.get("confidence") == "low":
+            return False
+        return data.get("contains_direct_quotes", False)
     except Exception as e:
-        print(f"Claim extraction error: {e}")
+        print(f"    Groundability check error: {e}")
+        return False  # conservative — skip on error
+
+# ── Change 2a: Quote extraction ───────────────────────────────────────────────
+
+def extract_raw_quotes(source_text, politician_name):
+    """
+    Step 2a: Extract only verbatim or near-verbatim quotes where the
+    politician makes a specific assertion about the real world.
+    """
+    prompt = f"""You are extracting direct quotations from a politician's speech or writing.
+
+Source text:
+{source_text[:8000]}
+
+Extract every discrete sentence or clause where {politician_name} makes a specific 
+assertion about the real world — something that could be true or false.
+
+Return JSON only — an array of raw quote objects:
+[
+  {{
+    "raw_quote": "exact words from the text",
+    "context": "one sentence describing what he was talking about"
+  }}
+]
+
+Strict rules:
+- Only include words {politician_name} actually said or wrote. No paraphrasing.
+- If you cannot put quotation marks around it and source it directly to him, exclude it.
+- Exclude rhetorical questions, jokes, and expressions of intent ("we're going to...").
+- Exclude attacks or accusations about other named people ("Congressman X voted against Y").
+- Exclude vague boasts ("we're doing great", "the best ever", "nobody has done more").
+- Maximum 10 quotes per source. Choose the most specific and concrete.
+- If there are no qualifying quotes, return []."""
+
+    try:
+        raw = call_claude(prompt, max_tokens=1200)
+        quotes = json.loads(raw)
+        if not isinstance(quotes, list):
+            return []
+        return quotes
+    except Exception as e:
+        print(f"    Quote extraction error: {e}")
         return []
 
-# ── Step 1b: Deduplicate claims within today's run ───────────────────────────
+# ── Change 2b: Claim scoring ──────────────────────────────────────────────────
 
-def is_duplicate_claim(claim_text, politician_id, date_str):
+def score_claim(raw_quote, context):
+    """
+    Step 2b: Score each extracted quote. Only verifiable claims with
+    no reject_reason proceed to Brave Search + verdict.
+    """
+    prompt = f"""You are evaluating whether a politician's statement contains a verifiable factual claim.
+
+Statement: "{raw_quote}"
+Context: "{context}"
+
+Return JSON only:
+{{
+  "claim_type": "historical_fact" or "statistical_claim" or "event_claim" or "opinion" or "prediction" or "vague",
+  "specific_entity": "the person, place, number, or event being asserted (or null)",
+  "specific_value": "the specific thing being claimed about it (or null)",
+  "verifiable": true or false,
+  "search_query": "a 6-10 word web search that would find confirming or refuting evidence (or null)",
+  "reject_reason": null or "opinion" or "vague" or "prediction" or "third_party_accusation" or "unverifiable"
+}}
+
+Rules:
+- "verifiable" is true only if a search engine could plausibly return evidence that 
+  directly confirms or refutes the claim.
+- If specific_entity or specific_value are null, set verifiable to false.
+- opinion, vague, prediction, and third_party_accusation always get a non-null reject_reason.
+- "The best ever" or "nobody has done more" = opinion unless it names a specific measurable metric.
+- Statistical claims must include an actual number to be verifiable.
+- "We have the best economy" = opinion, reject.
+- "Unemployment is 3.9%" = statistical_claim, verifiable."""
+
+    try:
+        raw = call_claude(prompt, max_tokens=300)
+        return json.loads(raw)
+    except Exception as e:
+        print(f"    Claim scoring error: {e}")
+        return {"verifiable": False, "reject_reason": "unverifiable"}
+
+# ── Change 3: Claim registry ──────────────────────────────────────────────────
+
+def check_registry(fp):
     conn = get_db()
-    existing = conn.execute("""
-        SELECT c.claim_text FROM claims c
-        JOIN statements s ON c.statement_id = s.id
-        WHERE s.politician_id = ? AND DATE(c.checked_at) = ?
-    """, (politician_id, date_str)).fetchall()
+    row = conn.execute(
+        "SELECT * FROM claim_registry WHERE claim_fingerprint = ?", (fp,)
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def update_registry(fp, raw_quote, search_query, verdict, summary):
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO claim_registry 
+            (claim_fingerprint, raw_quote, search_query, verdict, verdict_summary)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(claim_fingerprint) DO UPDATE SET
+            last_seen = date('now'),
+            occurrence_count = occurrence_count + 1,
+            verdict = excluded.verdict,
+            verdict_summary = excluded.verdict_summary
+    """, (fp, raw_quote, search_query, verdict, summary))
+    conn.commit()
     conn.close()
 
-    if not existing:
-        return False
+# ── Evidence search ───────────────────────────────────────────────────────────
 
-    claim_words = set(claim_text.lower().split())
-    if not claim_words:
-        return False
-
-    for row in existing:
-        ex_words = set(row["claim_text"].lower().split())
-        overlap = len(claim_words & ex_words) / len(claim_words)
-        if overlap > 0.70:
-            return True
-    return False
-
-# ── Step 2: Search for evidence ──────────────────────────────────────────────
-
-def search_for_claim(claim_text):
-    # Bias toward verification/fact-check articles rather than adjacent news
-    query = f"fact check {claim_text[:100]}"
-    results = brave_news_search(query[:120])
+def search_for_claim(search_query):
+    results = brave_news_search(search_query)
     return [{
         "title": r.get("title", ""),
         "url": r.get("url", ""),
         "snippet": r.get("description", "")
     } for r in results[:5]]
 
-# ── Step 3: Fact-check the substance ─────────────────────────────────────────
+# ── Verdict rendering (unchanged — working well) ──────────────────────────────
 
 def render_verdict(claim_text, politician_name, evidence):
     evidence_block = "\n".join([
@@ -113,94 +188,125 @@ def render_verdict(claim_text, politician_name, evidence):
 
     prompt = f"""You are a rigorous, nonpartisan fact-checker.
 
-{politician_name} asserted the following factual claim:
-"{claim_text}"
+{politician_name} stated: "{claim_text}"
 
-Your ONLY job: evaluate whether this factual assertion is accurate.
+Evaluate whether this factual assertion is accurate.
 Do NOT evaluate whether {politician_name} said it — assume they did.
-Do NOT comment on whether it was appropriate to say.
 Focus ONLY on whether the underlying facts are correct.
 
-Evidence from independent sources:
+Evidence:
 {evidence_block}
 
-Respond ONLY with this JSON object:
+Respond ONLY with this JSON:
 {{
-  "verdict": "TRUE" | "FALSE" | "MISLEADING" | "UNVERIFIABLE",
-  "confidence": "HIGH" | "MEDIUM" | "LOW",
-  "explanation": "2-3 sentences on whether the factual claim is accurate, citing specific evidence. Start with what the evidence shows, not with who said what.",
+  "verdict": "TRUE" or "FALSE" or "MISLEADING" or "UNVERIFIABLE",
+  "confidence": "HIGH" or "MEDIUM" or "LOW",
+  "explanation": "2-3 sentences on whether the factual claim is accurate, citing specific evidence.",
   "citations": [{{"title": "...", "url": "...", "snippet": "..."}}]
 }}
 
 Citation rules:
-- Only include sources that directly address the factual claim itself
-- Do NOT include sources merely because they mention {politician_name} or are topically adjacent
-- If no source directly addresses the claim, return an empty citations array
+- Only include sources that directly address the factual claim
+- Do NOT include sources merely because they mention {politician_name}
+- If no source directly addresses the claim, return empty citations array
 
 Verdict definitions:
-- TRUE = evidence confirms the factual assertion
-- FALSE = evidence contradicts the factual assertion  
-- MISLEADING = technically accurate but missing context that significantly changes the meaning
-- UNVERIFIABLE = insufficient independent evidence to confirm or deny
-
-No preamble, no markdown fences. JSON only."""
+- TRUE = evidence confirms the assertion
+- FALSE = evidence contradicts the assertion
+- MISLEADING = technically accurate but missing critical context
+- UNVERIFIABLE = insufficient independent evidence"""
 
     try:
-        resp = client.messages.create(
-            model=MODEL,
-            max_tokens=600,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        raw = resp.content[0].text.strip()
-        raw = raw.replace("```json", "").replace("```", "").strip()
+        raw = call_claude(prompt, max_tokens=600)
         return json.loads(raw)
     except Exception as e:
-        print(f"Verdict error: {e}")
-        return {
-            "verdict": "UNVERIFIABLE",
-            "confidence": "LOW",
-            "explanation": "Could not complete fact-check due to an error.",
-            "citations": []
-        }
+        print(f"    Verdict error: {e}")
+        return {"verdict": "UNVERIFIABLE", "confidence": "LOW",
+                "explanation": "Could not complete fact-check.", "citations": []}
 
-# ── Step 4: Full pipeline for one statement ──────────────────────────────────
+# ── Full pipeline for one statement ──────────────────────────────────────────
 
 def process_statement(statement, date_str):
-    statement_id = statement["id"]
-    politician_id = statement["politician_id"]
+    statement_id   = statement["id"]
+    politician_id  = statement["politician_id"]
     politician_name = statement["politician_name"]
-    raw_text = statement["raw_text"]
+    raw_text       = statement["raw_text"]
+    source_url     = statement.get("source_url", "")
 
-    print(f"  Extracting claims from statement {statement_id}...")
-    claims = extract_claims(raw_text, politician_name)
-    print(f"  Found {len(claims)} claims")
+    # Determine source type for groundability check
+    if "whitehouse.gov" in source_url:
+        source_type = "wh_transcript"
+    elif "trumpstruth.org" in source_url or "Truth Social" in raw_text:
+        source_type = "truth_social"
+    else:
+        source_type = "news_article"
+
+    # Change 1: Groundability pre-filter
+    if not is_groundable_source(raw_text, source_type):
+        print(f"  [SKIP non-grounded source] {source_url[:60]}")
+        return 0
+
+    # Change 2a: Extract raw quotes
+    print(f"  Extracting quotes from statement {statement_id} ({source_type})...")
+    quotes = extract_raw_quotes(raw_text, politician_name)
+    print(f"  Found {len(quotes)} raw quotes")
 
     conn = get_db()
     added = 0
-    for claim_text in claims:
-        if is_duplicate_claim(claim_text, politician_id, date_str):
-            print(f"    [SKIP duplicate] {claim_text[:60]}...")
+
+    for q in quotes:
+        raw_quote = q.get("raw_quote", "").strip()
+        context   = q.get("context", "")
+
+        if not raw_quote or len(raw_quote) < 10:
             continue
 
-        print(f"    Checking: {claim_text[:80]}...")
-        evidence = search_for_claim(claim_text)
-        verdict_data = render_verdict(claim_text, politician_name, evidence)
+        # Change 2b: Score the claim
+        score = score_claim(raw_quote, context)
+        if score.get("reject_reason") or not score.get("verifiable"):
+            print(f"    [REJECT {score.get('reject_reason','unverifiable')}] {raw_quote[:60]}...")
+            continue
+
+        search_query = score.get("search_query") or raw_quote[:80]
+        fp = fingerprint(raw_quote)
+
+        # Change 3: Check claim registry
+        cached = check_registry(fp)
+        if cached:
+            print(f"    [CACHED {cached['verdict']}] {raw_quote[:60]}...")
+            # Store in claims table using cached verdict
+            conn.execute("""
+                INSERT INTO claims
+                    (statement_id, claim_text, verdict, confidence, explanation, citations, checked_at)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+            """, (statement_id, raw_quote, cached["verdict"], "HIGH",
+                  f"[Cached] {cached['verdict_summary']}", "[]"))
+            conn.commit()
+            update_registry(fp, raw_quote, search_query, cached["verdict"], cached["verdict_summary"])
+            added += 1
+            continue
+
+        # New claim — run full pipeline
+        print(f"    Checking: {raw_quote[:80]}...")
+        evidence     = search_for_claim(search_query)
+        verdict_data = render_verdict(raw_quote, politician_name, evidence)
+
+        verdict  = verdict_data.get("verdict", "UNVERIFIABLE")
+        summary  = verdict_data.get("explanation", "")
 
         conn.execute("""
             INSERT INTO claims
                 (statement_id, claim_text, verdict, confidence, explanation, citations, checked_at)
             VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-        """, (
-            statement_id,
-            claim_text,
-            verdict_data.get("verdict", "UNVERIFIABLE"),
-            verdict_data.get("confidence", "LOW"),
-            verdict_data.get("explanation", ""),
-            json.dumps(verdict_data.get("citations", []))
-        ))
+        """, (statement_id, raw_quote, verdict,
+              verdict_data.get("confidence", "LOW"), summary,
+              json.dumps(verdict_data.get("citations", []))))
         conn.commit()
+
+        # Register in claim registry
+        update_registry(fp, raw_quote, search_query, verdict, summary)
         added += 1
 
     conn.close()
-    print(f"  Added {added} unique claims")
+    print(f"  Added {added} verified claims")
     return added
