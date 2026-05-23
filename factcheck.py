@@ -24,20 +24,27 @@ REJECT anything that is:
 - A hypothetical or rhetorical statement ("if Jesus was counting the votes...")
 - A vague or unmeasurable assertion ("we're doing great", "the best ever")
 - A statement by administration officials, aides, or spokespeople — only {politician_name} directly
-- A fact ABOUT {politician_name} reported by journalists (poll numbers about them, their approval ratings, economic stats about their performance) — only facts {politician_name} themselves asserted
+- A fact ABOUT {politician_name} reported by journalists (approval ratings, poll numbers, economic stats) — only facts {politician_name} themselves asserted
+- An accusation about a THIRD PARTY's voting record, character, or behavior ("Congressman X voted against Y", "Senator Z endorsed Biden") — these are political attacks, not verifiable world facts
+- A political endorsement, campaign attack, or partisan characterization of any person or party
 - Something already in the list below (avoid duplicates)
 
-GOOD examples of checkable claims:
-- "The US trade deficit with China is $500 billion" (specific measurable fact)
-- "NATO members agreed to 5% GDP spending at the last summit" (documented event)
-- "The 14th Amendment has guaranteed birthright citizenship since 1868" (historical fact)
+GOOD examples of checkable claims — {politician_name} asserting facts about the world:
+- "The US trade deficit with China is $500 billion" (specific measurable economic fact)
+- "NATO members agreed to 5% GDP spending at the last summit" (documented international event)
+- "The 14th Amendment has guaranteed birthright citizenship since 1868" (verifiable historical fact)
+- "We have 80,000 troops stationed in Europe" (specific military fact)
+- "The Energy Committee voted 48-1 on this bill" (documented legislative fact)
 
-BAD examples (reject these):
+BAD examples (reject all of these):
+- "Congressman X voted against our tax cuts" (accusation about third party)
+- "Senator Y endorsed Biden" (political attack on third party)
 - "I'd be happy to do it" (intention/opinion)
 - "Colbert is finally finished" (characterization)
-- "We have total control" (vague assertion)
-- "No American leader has done this in 50 years" (vague, hard to check)
-- "He would have won California if Jesus was counting" (hypothetical/rhetorical)
+- "We have total control" (vague, unmeasurable)
+- "No American leader has done this in 50 years" (vague)
+- "He would have won California if Jesus was counting" (hypothetical)
+- "She's a crooked politician" (opinion/attack)
 
 Return ONLY a JSON array of claim strings — just the factual substance, no attribution prefix.
 If no qualifying claims exist, return [].

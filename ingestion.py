@@ -186,6 +186,16 @@ def fetch_truth_social(politician):
             if is_duplicate_url(post_url, politician["id"]):
                 continue
 
+            # Skip pure campaign attack posts — no factual claims to check
+            attack_signals = ["voted against", "voted for allowing", "voted to allow",
+                              "endorsed", "endorsed crooked", "RINO", "Radical Left",
+                              "witch hunt", "election interference", "fake news",
+                              "corrupt", "crooked", "do nothing"]
+            post_lower = post_text.lower()
+            if sum(1 for s in attack_signals if s.lower() in post_lower) >= 2:
+                print(f"  [SKIP campaign post] {post_text[:60]}...")
+                continue
+
             # Label it clearly as a Truth Social post
             raw_text = f"[Truth Social post by Donald Trump]\n\n{post_text}"
             store_statement(
