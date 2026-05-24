@@ -1,37 +1,5 @@
 {% extends "base.html" %}
-{% block title %}PolitiPrism — Daily Digest<script>
-function sendFeedback(claimId, rating, btn) {
-    var yesBtn = document.getElementById('fb-yes-' + claimId);
-    var noBtn  = document.getElementById('fb-no-'  + claimId);
-    // Optimistic UI update immediately
-    yesBtn.className = 'fb-btn' + (rating === 1  ? ' active-relevant' : '');
-    noBtn.className  = 'fb-btn' + (rating === -1 ? ' active-not' : '');
-
-    fetch('/feedback/' + claimId + '/' + rating, {
-        credentials: 'same-origin',
-        headers: { 'Accept': 'application/json' }
-    })
-    .then(function(r) {
-        if (!r.ok) {
-            // Revert on error
-            yesBtn.className = 'fb-btn';
-            noBtn.className  = 'fb-btn';
-            console.error('Feedback failed:', r.status);
-        }
-        return r.json();
-    })
-    .then(function(data) {
-        if (!data.ok) {
-            yesBtn.className = 'fb-btn';
-            noBtn.className  = 'fb-btn';
-        }
-    })
-    .catch(function(err) {
-        console.error('Feedback error:', err);
-    });
-}
-</script>
-{% endblock %}
+{% block title %}PolitiPrism — Daily Digest{% endblock %}
 {% block extra_styles %}
 .date-nav { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
 .date-nav input[type=date] { background: #1a1d2e; border: 1px solid #3a3d5c;
@@ -44,8 +12,6 @@ function sendFeedback(claimId, rating, btn) {
            padding: 9px 20px; border-radius: 6px; font-size: 0.9rem; border: 1px solid #6c63ff;
            cursor: pointer; margin-left: 8px; }
 .pdf-btn:hover { background: #3a3d6e; }
-
-/* ── Summary table ── */
 .summary-block { background: #1a1d2e; border: 1px solid #2e3150; border-radius: 10px;
                  padding: 20px 22px; margin-bottom: 36px; }
 .summary-block h2 { font-size: 1rem; color: #c8bfff; margin-bottom: 16px;
@@ -65,8 +31,6 @@ function sendFeedback(claimId, rating, btn) {
 .st-UNVERIFIABLE{ background: #2a2d3e; color: #9d9db5; }
 .summary-divider { font-size: 0.75rem; color: #6c63ff; font-weight: 600;
                    padding: 10px 10px 4px; letter-spacing: 0.5px; }
-
-/* ── Detail cards ── */
 .section-label { font-size: 1rem; color: #c8bfff; font-weight: 600; margin: 36px 0 6px;
                  border-bottom: 1px solid #2e3150; padding-bottom: 8px; }
 .section-label span { font-size: 0.82rem; color: #9d9db5; font-weight: 400; margin-left: 8px; }
@@ -98,19 +62,17 @@ function sendFeedback(claimId, rating, btn) {
 .empty-state { text-align: center; color: #9d9db5; padding: 60px 0; font-size: 0.95rem; }
 .feedback-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .fb-btn { background: none; border: 1px solid #2e3150; border-radius: 20px;
-          padding: 3px 12px; font-size: 0.8rem; cursor: pointer; color: #9d9db5;
-          transition: all 0.2s; }
+          padding: 4px 14px; font-size: 0.82rem; cursor: pointer; color: #9d9db5;
+          transition: all 0.15s; }
 .fb-btn:hover { border-color: #6c63ff; color: #c8bfff; }
 .fb-btn.active-relevant { background: #1e3d2a; border-color: #4caf73; color: #4caf73; }
 .fb-btn.active-not { background: #3d1e1e; border-color: #e05c5c; color: #e05c5c; }
 .fb-label { font-size: 0.75rem; color: #9d9db5; }
-.sig-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+.sig-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; margin-left: 4px; }
 .sig-high   { background: #1e2a3d; color: #6ca0ff; }
 .sig-medium { background: #2a2a1e; color: #c8a040; }
-
-/* ── Print / PDF styles ── */
 @media print {
-    header, .date-nav, .no-print { display: none !important; }
+    header, .date-nav, .no-print, .feedback-row { display: none !important; }
     body { background: #fff; color: #111; font-size: 11pt; }
     .summary-block, .claim-card { background: #fff; border: 1px solid #ccc;
                                    border-radius: 4px; break-inside: avoid; }
@@ -133,15 +95,12 @@ function sendFeedback(claimId, rating, btn) {
     a { text-decoration: none; }
     .print-title { display: block !important; }
 }
-.print-title { display: none; font-size: 1.4rem; font-weight: 700;
-               color: #111; margin-bottom: 4px; }
+.print-title { display: none; font-size: 1.4rem; font-weight: 700; color: #111; margin-bottom: 4px; }
 .print-subtitle { display: none; font-size: 0.9rem; color: #555; margin-bottom: 20px; }
 @media print { .print-subtitle { display: block !important; } }
 {% endblock %}
 
 {% block content %}
-
-<!-- Print-only title -->
 <div class="print-title">🔬 PolitiPrism — Fact-Check Digest</div>
 <div class="print-subtitle">{{ date }} &nbsp;|&nbsp; politiprism.app</div>
 
@@ -163,7 +122,7 @@ function sendFeedback(claimId, rating, btn) {
     </span>
 </div>
 
-<!-- Pipeline progress bar (digest page) -->
+<!-- Pipeline progress bar -->
 <div id="pipeline-progress" style="display:none;margin-bottom:20px;" class="no-print">
     <div style="background:#1a1d2e;border-radius:6px;height:6px;overflow:hidden;border:1px solid #2e3150;">
         <div id="progress-bar" style="background:#6c63ff;height:100%;width:0%;transition:width 0.5s;"></div>
@@ -174,85 +133,17 @@ function sendFeedback(claimId, rating, btn) {
     </div>
 </div>
 
-<script>
-(function() {
-    var pollInterval = null;
-    var wasPreviouslyRunning = false;
-
-    function poll() {
-        fetch("/admin/pipeline-status")
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                var running = data.running === 1;
-                var runBtn = document.getElementById("run-btn");
-                var indicator = document.getElementById("pipeline-indicator");
-                var doneEl = document.getElementById("pipeline-done");
-                var progressEl = document.getElementById("pipeline-progress");
-                var stageEl = document.getElementById("pipeline-stage");
-                var progressBar = document.getElementById("progress-bar");
-                var progressLabel = document.getElementById("progress-label");
-                var claimsLabel = document.getElementById("claims-label");
-                var doneMsg = document.getElementById("pipeline-done-msg");
-
-                if (runBtn) {
-                    runBtn.style.opacity = running ? "0.4" : "1";
-                    runBtn.style.pointerEvents = running ? "none" : "auto";
-                }
-
-                if (running) {
-                    wasPreviouslyRunning = true;
-                    indicator.style.display = "inline";
-                    doneEl.style.display = "none";
-                    stageEl.textContent = data.stage || "Running...";
-                    var total = data.statements_total || 0;
-                    var done = data.statements_done || 0;
-                    var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-                    if (total > 0) {
-                        progressEl.style.display = "block";
-                        progressBar.style.width = pct + "%";
-                        progressLabel.textContent = "Statements: " + done + " / " + total;
-                        claimsLabel.textContent = "Claims found: " + (data.claims_found || 0);
-                    }
-                } else {
-                    indicator.style.display = "none";
-                    progressEl.style.display = "none";
-                    if (wasPreviouslyRunning) {
-                        // Pipeline just finished — reload page to show new claims
-                        wasPreviouslyRunning = false;
-                        doneEl.style.display = "inline";
-                        doneMsg.textContent = data.stage || "Complete";
-                        clearInterval(pollInterval);
-                        setTimeout(function() { window.location.reload(); }, 2000);
-                    } else if (data.claims_found > 0) {
-                        doneEl.style.display = "inline";
-                        doneMsg.textContent = data.stage || "Complete";
-                    }
-                }
-            })
-            .catch(function() {});
-    }
-
-    poll();
-    pollInterval = setInterval(poll, 3000);
-})();
-</script>
-
 {% if results %}
 
-<!-- ── SUMMARY TABLE ── -->
+<!-- SUMMARY TABLE -->
 <div class="summary-block">
     <h2>📋 Summary — {{ date }}</h2>
     <table class="summary-table">
         <tr>
-            <th>Who</th>
-            <th>Claim</th>
-            <th>Verdict</th>
-            <th>Confidence</th>
+            <th>Who</th><th>Claim</th><th>Verdict</th><th>Confidence</th>
         </tr>
         {% for group in results %}
-            <tr>
-                <td colspan="4" class="summary-divider">{{ group.politician.name | upper }}</td>
-            </tr>
+            <tr><td colspan="4" class="summary-divider">{{ group.politician.name | upper }}</td></tr>
             {% for claim in group.claims %}
             <tr>
                 <td>{{ group.politician.name }}</td>
@@ -265,10 +156,9 @@ function sendFeedback(claimId, rating, btn) {
     </table>
 </div>
 
-<!-- ── DETAIL SECTION ── -->
+<!-- DETAIL SECTION -->
 <div class="section-label">
-    Detailed Fact-Checks
-    <span>full analysis with sources</span>
+    Detailed Fact-Checks <span>full analysis with sources</span>
 </div>
 
 {% for group in results %}
@@ -283,39 +173,36 @@ function sendFeedback(claimId, rating, btn) {
         <div>
             <span class="verdict-badge badge-{{ claim.verdict }}">{{ claim.verdict }}</span>
             <span class="confidence">{{ claim.confidence }} confidence</span>
+            {% if claim.significance %}
+                <span class="sig-badge sig-{{ claim.significance }}">{{ claim.significance }}</span>
+            {% endif %}
         </div>
         <div class="claim-text">"{{ claim.claim_text }}"</div>
         <div class="explanation">{{ claim.explanation }}</div>
         {% if claim.source_url %}
             <a class="source-link" href="{{ claim.source_url }}" target="_blank">
-                {% if "trumpstruth" in claim.source_url %}
-                    🐦 Truth Social — {{ claim.source_title or "" }}
-                {% elif "whitehouse.gov" in claim.source_url %}
-                    🏛 White House Transcript — {{ claim.source_title or "" }}
-                {% else %}
-                    📰 {{ claim.source_title or claim.source_url }}
-                {% endif %}
+                {% if "trumpstruth" in claim.source_url %}🐦 Truth Social
+                {% elif "whitehouse.gov" in claim.source_url %}🏛 White House Transcript
+                {% else %}📰{% endif %}
+                {{ claim.source_title or claim.source_url }}
             </a>
-        {% endif %}
-        {% if is_admin %}
-        <div class="feedback-row no-print">
-            <span class="fb-label">Relevant to fact-check?</span>
-            <button class="fb-btn {% if claim.user_rating == 'relevant' %}active-relevant{% endif %}"
-                    onclick="sendFeedback({{ claim.id }}, 1, this)"
-                    id="fb-yes-{{ claim.id }}">👍 Yes</button>
-            <button class="fb-btn {% if claim.user_rating == 'not_relevant' %}active-not{% endif %}"
-                    onclick="sendFeedback({{ claim.id }}, -1, this)"
-                    id="fb-no-{{ claim.id }}">👎 No</button>
-            {% if claim.significance %}
-                <span class="sig-badge sig-{{ claim.significance }}">{{ claim.significance }} significance</span>
-            {% endif %}
-        </div>
         {% endif %}
         {% if claim.citations %}
         <div class="citations">
             {% for cite in claim.citations[:3] %}
                 <a href="{{ cite.url }}" target="_blank">🔗 {{ cite.title or cite.url }}</a>
             {% endfor %}
+        </div>
+        {% endif %}
+        {% if is_admin %}
+        <div class="feedback-row no-print">
+            <span class="fb-label">Worth checking?</span>
+            <button class="fb-btn {% if claim.user_rating == 'relevant' %}active-relevant{% endif %}"
+                    id="fb-yes-{{ claim.id }}"
+                    onclick="sendFeedback({{ claim.id }}, 1)">👍 Yes</button>
+            <button class="fb-btn {% if claim.user_rating == 'not_relevant' %}active-not{% endif %}"
+                    id="fb-no-{{ claim.id }}"
+                    onclick="sendFeedback({{ claim.id }}, -1)">👎 No</button>
         </div>
         {% endif %}
     </div>
@@ -333,4 +220,74 @@ function sendFeedback(claimId, rating, btn) {
     {% endif %}
 </div>
 {% endif %}
+
+<script>
+function sendFeedback(claimId, rating) {
+    var yesBtn = document.getElementById('fb-yes-' + claimId);
+    var noBtn  = document.getElementById('fb-no-'  + claimId);
+    yesBtn.className = 'fb-btn' + (rating === 1  ? ' active-relevant' : '');
+    noBtn.className  = 'fb-btn' + (rating === -1 ? ' active-not' : '');
+    fetch('/feedback/' + claimId + '/' + rating, { credentials: 'same-origin' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (!data.ok) {
+                yesBtn.className = 'fb-btn';
+                noBtn.className  = 'fb-btn';
+            }
+        })
+        .catch(function(e) { console.error('feedback error', e); });
+}
+
+(function() {
+    var pollInterval = null;
+    var wasPreviouslyRunning = false;
+    function poll() {
+        fetch("/admin/pipeline-status", { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var running = data.running === 1;
+                var runBtn = document.getElementById("run-btn");
+                var indicator = document.getElementById("pipeline-indicator");
+                var doneEl = document.getElementById("pipeline-done");
+                var progressEl = document.getElementById("pipeline-progress");
+                var stageEl = document.getElementById("pipeline-stage");
+                var progressBar = document.getElementById("progress-bar");
+                var progressLabel = document.getElementById("progress-label");
+                var claimsLabel = document.getElementById("claims-label");
+                var doneMsg = document.getElementById("pipeline-done-msg");
+                if (runBtn) { runBtn.style.opacity = running ? "0.4" : "1"; runBtn.style.pointerEvents = running ? "none" : "auto"; }
+                if (running) {
+                    wasPreviouslyRunning = true;
+                    indicator.style.display = "inline";
+                    doneEl.style.display = "none";
+                    stageEl.textContent = data.stage || "Running...";
+                    var total = data.statements_total || 0;
+                    var done = data.statements_done || 0;
+                    if (total > 0) {
+                        progressEl.style.display = "block";
+                        progressBar.style.width = Math.round(done/total*100) + "%";
+                        progressLabel.textContent = "Statements: " + done + " / " + total;
+                        claimsLabel.textContent = "Claims found: " + (data.claims_found || 0);
+                    }
+                } else {
+                    indicator.style.display = "none";
+                    progressEl.style.display = "none";
+                    if (wasPreviouslyRunning) {
+                        wasPreviouslyRunning = false;
+                        doneEl.style.display = "inline";
+                        doneMsg.textContent = data.stage || "Complete";
+                        clearInterval(pollInterval);
+                        pollInterval = setInterval(poll, 5000);
+                        setTimeout(function() { window.location.reload(); }, 2000);
+                    } else if (data.claims_found > 0) {
+                        doneEl.style.display = "inline";
+                        doneMsg.textContent = data.stage || "Complete";
+                    }
+                }
+            }).catch(function() {});
+    }
+    poll();
+    pollInterval = setInterval(poll, 3000);
+})();
+</script>
 {% endblock %}
