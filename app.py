@@ -482,7 +482,6 @@ def clear_all():
 # ── Feedback & learning ──────────────────────────────────────────────────────
 
 @app.route("/feedback/<int:claim_id>/<int:rating>")
-@require_login
 def submit_feedback(claim_id, rating):
     """rating: 1=relevant, -1=not relevant"""
     if rating not in (1, -1):
