@@ -1,16 +1,34 @@
 {% extends "base.html" %}
 {% block title %}PolitiPrism — Daily Digest<script>
 function sendFeedback(claimId, rating, btn) {
-    fetch(`/feedback/${claimId}/${rating}`)
-        .then(r => r.json())
-        .then(data => {
-            if (data.ok) {
-                var yesBtn = document.getElementById('fb-yes-' + claimId);
-                var noBtn  = document.getElementById('fb-no-'  + claimId);
-                yesBtn.className = 'fb-btn' + (rating === 1  ? ' active-relevant' : '');
-                noBtn.className  = 'fb-btn' + (rating === -1 ? ' active-not' : '');
-            }
-        });
+    var yesBtn = document.getElementById('fb-yes-' + claimId);
+    var noBtn  = document.getElementById('fb-no-'  + claimId);
+    // Optimistic UI update immediately
+    yesBtn.className = 'fb-btn' + (rating === 1  ? ' active-relevant' : '');
+    noBtn.className  = 'fb-btn' + (rating === -1 ? ' active-not' : '');
+
+    fetch('/feedback/' + claimId + '/' + rating, {
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(function(r) {
+        if (!r.ok) {
+            // Revert on error
+            yesBtn.className = 'fb-btn';
+            noBtn.className  = 'fb-btn';
+            console.error('Feedback failed:', r.status);
+        }
+        return r.json();
+    })
+    .then(function(data) {
+        if (!data.ok) {
+            yesBtn.className = 'fb-btn';
+            noBtn.className  = 'fb-btn';
+        }
+    })
+    .catch(function(err) {
+        console.error('Feedback error:', err);
+    });
 }
 </script>
 {% endblock %}
