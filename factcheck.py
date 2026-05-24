@@ -90,10 +90,10 @@ Return JSON only — an array of raw quote objects:
 Strict rules:
 - Only include words {politician_name} actually said or wrote. No paraphrasing.
 - If you cannot put quotation marks around it and source it directly to him, exclude it.
-- Exclude rhetorical questions, jokes, and expressions of intent ("we're going to...").
-- Exclude attacks or accusations about other named people ("Congressman X voted against Y").
-- Exclude vague boasts ("we're doing great", "the best ever", "nobody has done more").
-- Maximum 10 quotes per source. Choose the most specific and concrete.
+- Exclude pure rhetoric with no factual content ("we will win", "it's a disaster").
+- Exclude attacks naming specific private individuals.
+- Include borderline cases — the editor will rate relevance via feedback.
+- Maximum 15 quotes per source. Err on the side of inclusion during training.
 - If there are no qualifying quotes, return []."""
 
     try:
@@ -155,8 +155,11 @@ Return JSON only:
 Hard rules (always apply regardless of significance):
 - If verifiable is false, set reject_reason to "unverifiable"
 - opinion, vague, prediction, third_party_accusation always get reject_reason
-- "low" significance always gets reject_reason "low_significance"
-- Scheduling reports ("I had a call", "I am in the Oval Office") = low significance
+- During TRAINING MODE (fewer than 50 editor ratings), use "medium" as the default
+  significance — only reject truly content-free statements
+- "low" significance gets reject_reason "low_significance" only when clearly trivial
+- Obvious scheduling reports with zero factual content = low significance
+- When in doubt, pass the claim through for editor rating
 - Election results, legislative votes, public records ARE verifiable
 - For search_query: use specific names, numbers, topics — never vague queries"""
 
