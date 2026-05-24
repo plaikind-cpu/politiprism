@@ -60,17 +60,32 @@
                margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .citations a:hover { text-decoration: underline; }
 .empty-state { text-align: center; color: #9d9db5; padding: 60px 0; font-size: 0.95rem; }
-.feedback-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.feedback-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .fb-btn { background: none; border: 1px solid #2e3150; border-radius: 20px;
           padding: 4px 14px; font-size: 0.82rem; cursor: pointer; color: #9d9db5;
           transition: all 0.15s; }
 .fb-btn:hover { border-color: #6c63ff; color: #c8bfff; }
 .fb-btn.active-relevant { background: #1e3d2a; border-color: #4caf73; color: #4caf73; }
 .fb-btn.active-not { background: #3d1e1e; border-color: #e05c5c; color: #e05c5c; }
+.fb-btn.active-comment { background: #2a2a3e; border-color: #6c63ff; color: #c8bfff; }
 .fb-label { font-size: 0.75rem; color: #9d9db5; }
 .sig-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; margin-left: 4px; }
 .sig-high   { background: #1e2a3d; color: #6ca0ff; }
 .sig-medium { background: #2a2a1e; color: #c8a040; }
+.fb-comment-box { display: none; margin-top: 10px; width: 100%;
+                  background: #0f1117; border: 1px solid #3a3d5c; border-radius: 8px;
+                  padding: 10px; }
+.fb-comment-box textarea { width: 100%; background: transparent; border: none;
+                            color: #e0e0e0; font-size: 0.85rem; resize: vertical;
+                            min-height: 60px; outline: none; font-family: inherit; }
+.fb-comment-box input { width: 100%; background: transparent; border: none;
+                         border-top: 1px solid #2e3150; color: #e0e0e0;
+                         font-size: 0.82rem; padding: 8px 0 0; outline: none;
+                         font-family: inherit; margin-top: 6px; }
+.fb-comment-box input::placeholder, .fb-comment-box textarea::placeholder { color: #555; }
+.fb-submit { background: #6c63ff; color: white; border: none; border-radius: 6px;
+             padding: 6px 16px; font-size: 0.82rem; cursor: pointer; margin-top: 8px; }
+.fb-submit:hover { background: #7c73ff; }
 @media print {
     header, .date-nav, .no-print, .feedback-row { display: none !important; }
     body { background: #fff; color: #111; font-size: 11pt; }
@@ -195,7 +210,7 @@
         </div>
         {% endif %}
         {% if is_admin %}
-        <div class="feedback-row no-print">
+        <div class="feedback-row no-print" id="fb-row-{{ claim.id }}">
             <span class="fb-label">Worth checking?</span>
             <button class="fb-btn {% if claim.user_rating == 'relevant' %}active-relevant{% endif %}"
                     id="fb-yes-{{ claim.id }}"
@@ -203,6 +218,20 @@
             <button class="fb-btn {% if claim.user_rating == 'not_relevant' %}active-not{% endif %}"
                     id="fb-no-{{ claim.id }}"
                     onclick="sendFeedback({{ claim.id }}, -1)">👎 No</button>
+            <button class="fb-btn {% if claim.user_rating == 'commented' %}active-comment{% endif %}"
+                    id="fb-cmt-{{ claim.id }}"
+                    onclick="toggleComment({{ claim.id }})">💬 Comment</button>
+        </div>
+        <div class="fb-comment-box no-print" id="fb-box-{{ claim.id }}">
+            <textarea id="fb-text-{{ claim.id }}"
+                      placeholder="Explain your rating — e.g. 'The release of the report is not checkable, but the typos characterization is'"></textarea>
+            <input id="fb-sub-{{ claim.id }}"
+                   placeholder="Optional: enter a sub-claim to fact-check — e.g. 'The DNC autopsy report contained numerous typos'">
+            <div style="display:flex;gap:8px;margin-top:8px;">
+                <button class="fb-submit" onclick="submitComment({{ claim.id }}, 1)">👍 Relevant + Save</button>
+                <button class="fb-submit" style="background:#5a3d3d;" onclick="submitComment({{ claim.id }}, -1)">👎 Not Relevant + Save</button>
+                <button class="fb-submit" style="background:#3a3d5c;" onclick="submitComment({{ claim.id }}, null)">💬 Comment Only</button>
+            </div>
         </div>
         {% endif %}
     </div>
@@ -225,17 +254,44 @@
 function sendFeedback(claimId, rating) {
     var yesBtn = document.getElementById('fb-yes-' + claimId);
     var noBtn  = document.getElementById('fb-no-'  + claimId);
+    var cmtBtn = document.getElementById('fb-cmt-' + claimId);
     yesBtn.className = 'fb-btn' + (rating === 1  ? ' active-relevant' : '');
     noBtn.className  = 'fb-btn' + (rating === -1 ? ' active-not' : '');
-    fetch('/feedback/' + claimId + '/' + rating, { credentials: 'same-origin' })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (!data.ok) {
-                yesBtn.className = 'fb-btn';
-                noBtn.className  = 'fb-btn';
-            }
-        })
-        .catch(function(e) { console.error('feedback error', e); });
+    cmtBtn.className = 'fb-btn';
+    postFeedback({ claim_id: claimId, rating: rating });
+}
+
+function toggleComment(claimId) {
+    var box = document.getElementById('fb-box-' + claimId);
+    var btn = document.getElementById('fb-cmt-' + claimId);
+    var showing = box.style.display === 'block';
+    box.style.display = showing ? 'none' : 'block';
+    btn.className = 'fb-btn' + (showing ? '' : ' active-comment');
+    if (!showing) document.getElementById('fb-text-' + claimId).focus();
+}
+
+function submitComment(claimId, rating) {
+    var comment  = document.getElementById('fb-text-' + claimId).value.trim();
+    var subClaim = document.getElementById('fb-sub-'  + claimId).value.trim();
+    var yesBtn = document.getElementById('fb-yes-' + claimId);
+    var noBtn  = document.getElementById('fb-no-'  + claimId);
+    var cmtBtn = document.getElementById('fb-cmt-' + claimId);
+    yesBtn.className = 'fb-btn' + (rating === 1  ? ' active-relevant' : '');
+    noBtn.className  = 'fb-btn' + (rating === -1 ? ' active-not' : '');
+    cmtBtn.className = 'fb-btn active-comment';
+    document.getElementById('fb-box-' + claimId).style.display = 'none';
+    postFeedback({ claim_id: claimId, rating: rating, comment: comment, sub_claim: subClaim });
+}
+
+function postFeedback(payload) {
+    fetch('/feedback', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .catch(function(e) { console.error('feedback error', e); });
 }
 
 (function() {

@@ -60,6 +60,14 @@ th { color: #9d9db5; text-align: left; }
         <div class="lbl">👎 Not Relevant</div>
     </div>
     <div class="stat-card">
+        <div class="num">{{ stats.total_commented }}</div>
+        <div class="lbl">💬 Commented</div>
+    </div>
+    <div class="stat-card">
+        <div class="num">{{ stats.sub_claims }}</div>
+        <div class="lbl">Sub-claims Queued</div>
+    </div>
+    <div class="stat-card">
         <div class="num">{{ stats.recent_accuracy }}%</div>
         <div class="lbl">Recent Accuracy</div>
     </div>
@@ -78,6 +86,22 @@ th { color: #9d9db5; text-align: left; }
         Each rating immediately improves the AI's judgment for future runs.
     </div>
 </div>
+
+{% if stats.recent_comments %}
+<div class="section">
+    <h2>Recent Editor Comments</h2>
+    <p style="font-size:0.82rem;color:#9d9db5;margin-bottom:12px;">
+        These are your most valuable training examples — the AI learns from the nuance in these notes:
+    </p>
+    {% for ex in stats.recent_comments %}
+    <div class="ex-item">
+        {% if ex.rating == 1 %}👍{% elif ex.rating == -1 %}👎{% else %}💬{% endif %}
+        <strong style="color:#c8c8e0;">"{{ ex.claim_text[:100] }}{% if ex.claim_text|length > 100 %}...{% endif %}"</strong><br>
+        <span style="color:#9d9db5;font-size:0.8rem;padding-left:18px;">→ {{ ex.comment }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
 {% if stats.nr_examples %}
 <div class="section">
