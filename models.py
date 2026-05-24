@@ -53,16 +53,22 @@ def init_db():
         )
     """)
 
-    # Invited users (magic-link auth)
+    # Invited users with password auth
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
+            password_hash TEXT,
             token TEXT,
             token_expires TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         )
     """)
+    # Add password_hash column if upgrading existing DB
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+    except:
+        pass  # column already exists
 
     # Pipeline run status
     c.execute("""

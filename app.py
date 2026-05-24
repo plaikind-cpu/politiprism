@@ -1,6 +1,7 @@
 import os
 import json
 import secrets
+import bcrypt
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from models import init_db, get_db
@@ -32,52 +33,70 @@ def is_admin():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if is_logged_in():
+        return redirect(url_for("digest"))
+
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
+        email    = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "").encode("utf-8")
+
         conn = get_db()
         user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         conn.close()
 
         if not user:
-            flash("That email is not on the invite list.")
+            flash("Email not recognized.")
             return render_template("login.html")
 
-        # Generate magic link token
-        token = secrets.token_urlsafe(32)
-        expires = (datetime.utcnow() + timedelta(hours=1)).isoformat()
-        conn = get_db()
-        conn.execute("UPDATE users SET token = ?, token_expires = ? WHERE email = ?",
-                     (token, expires, email))
-        conn.commit()
-        conn.close()
+        if not user["password_hash"]:
+            flash("No password set for this account. Ask the admin to set one.")
+            return render_template("login.html")
 
-        magic_url = url_for("magic_login", token=token, _external=True)
-        print(f"MAGIC LINK for {email}: {magic_url}")  # Railway logs — no email infra needed yet
-        flash(f"Magic link generated. Check Railway logs (or console) for the link.")
-        return render_template("login.html")
+        if not bcrypt.checkpw(password, user["password_hash"].encode("utf-8")):
+            flash("Incorrect password.")
+            return render_template("login.html")
+
+        session["user_email"] = user["email"]
+        return redirect(url_for("digest"))
 
     return render_template("login.html")
 
-@app.route("/magic/<token>")
-def magic_login(token):
-    conn = get_db()
-    user = conn.execute(
-        "SELECT * FROM users WHERE token = ?", (token,)
-    ).fetchone()
-    conn.close()
+@app.route("/change-password", methods=["GET", "POST"])
+@require_login
+def change_password():
+    if request.method == "POST":
+        current  = request.form.get("current", "").encode("utf-8")
+        new_pw   = request.form.get("new_password", "")
+        confirm  = request.form.get("confirm", "")
 
-    if not user:
-        return "Invalid or expired link.", 403
-    if datetime.utcnow().isoformat() > user["token_expires"]:
-        return "Link expired. Please request a new one.", 403
+        conn = get_db()
+        user = conn.execute(
+            "SELECT * FROM users WHERE email = ?", (session["user_email"],)
+        ).fetchone()
+        conn.close()
 
-    session["user_email"] = user["email"]
-    conn = get_db()
-    conn.execute("UPDATE users SET token = NULL, token_expires = NULL WHERE email = ?",
-                 (user["email"],))
-    conn.commit()
-    conn.close()
-    return redirect(url_for("digest"))
+        if user["password_hash"] and not bcrypt.checkpw(current, user["password_hash"].encode("utf-8")):
+            flash("Current password is incorrect.")
+            return render_template("change_password.html")
+
+        if new_pw != confirm:
+            flash("New passwords do not match.")
+            return render_template("change_password.html")
+
+        if len(new_pw) < 8:
+            flash("Password must be at least 8 characters.")
+            return render_template("change_password.html")
+
+        hashed = bcrypt.hashpw(new_pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        conn = get_db()
+        conn.execute("UPDATE users SET password_hash = ? WHERE email = ?",
+                     (hashed, session["user_email"]))
+        conn.commit()
+        conn.close()
+        flash("Password updated successfully.")
+        return redirect(url_for("digest"))
+
+    return render_template("change_password.html")
 
 @app.route("/logout")
 def logout():
@@ -366,6 +385,23 @@ def add_user():
         except:
             pass  # already exists
         conn.close()
+    return redirect(url_for("admin"))
+
+@app.route("/admin/user/set-password/<int:user_id>", methods=["POST"])
+@require_login
+def set_user_password(user_id):
+    if not is_admin():
+        return "Access denied.", 403
+    new_pw = request.form.get("password", "").strip()
+    if len(new_pw) < 8:
+        flash("Password must be at least 8 characters.")
+        return redirect(url_for("admin"))
+    hashed = bcrypt.hashpw(new_pw.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    conn = get_db()
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, user_id))
+    conn.commit()
+    conn.close()
+    flash("Password set successfully.")
     return redirect(url_for("admin"))
 
 @app.route("/admin/user/remove/<int:user_id>")
