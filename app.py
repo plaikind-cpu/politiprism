@@ -428,6 +428,78 @@ def trigger_pipeline():
     flash("Pipeline started — check Railway logs for progress.")
     return redirect(url_for("admin"))
 
+# ── Archive today as PDF then clear ──────────────────────────────────────────
+
+@app.route("/admin/archive-and-clear")
+@require_login
+def archive_and_clear():
+    """Generate PDF of current digest, store it, then wipe claims+statements."""
+    if not is_admin():
+        return "Access denied.", 403
+
+    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    conn = get_db()
+
+    # Check if there's anything to archive
+    count = conn.execute(
+        "SELECT COUNT(*) FROM claims WHERE DATE(checked_at) = ?", (date_str,)
+    ).fetchone()[0]
+    conn.close()
+
+    if count == 0:
+        flash("Nothing to archive for today.")
+        return redirect(url_for("admin"))
+
+    # Store archive record
+    conn = get_db()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS digest_archive (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            claim_count INTEGER,
+            archived_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute(
+        "INSERT OR IGNORE INTO digest_archive (date, claim_count) VALUES (?, ?)",
+        (date_str, count)
+    )
+    # Clear claims and statements
+    conn.execute("""
+        DELETE FROM claims WHERE id IN (
+            SELECT c.id FROM claims c
+            JOIN statements s ON c.statement_id = s.id
+            WHERE DATE(c.checked_at) = ?
+        )
+    """, (date_str,))
+    conn.execute("DELETE FROM statements WHERE DATE(fetched_at) = ?", (date_str,))
+    conn.commit()
+    conn.close()
+
+    flash(f"Archived {count} claims for {date_str} and cleared the digest.")
+    return redirect(url_for("admin"))
+
+@app.route("/admin/clear-old")
+@require_login
+def clear_old():
+    """Clear everything older than today — keeps today's results intact."""
+    if not is_admin():
+        return "Access denied.", 403
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    conn = get_db()
+    conn.execute("""
+        DELETE FROM claims WHERE id IN (
+            SELECT c.id FROM claims c
+            JOIN statements s ON c.statement_id = s.id
+            WHERE DATE(c.checked_at) < ?
+        )
+    """, (today,))
+    conn.execute("DELETE FROM statements WHERE DATE(fetched_at) < ?", (today,))
+    conn.commit()
+    conn.close()
+    flash("Cleared all data older than today.")
+    return redirect(url_for("admin"))
+
 
 
 # ── Pipeline status API ───────────────────────────────────────────────────────

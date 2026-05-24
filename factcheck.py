@@ -89,7 +89,10 @@ Return JSON only — an array of raw quote objects:
 
 Strict rules:
 - Only include words {politician_name} actually said or wrote. No paraphrasing.
-- If you cannot put quotation marks around it and source it directly to him, exclude it.
+- Each raw_quote must be a COMPLETE THOUGHT — at minimum a full sentence with a subject and predicate.
+  REJECT fragments like "Fighting us in Court." or "Very unfair!" — these have no checkable content.
+  ACCEPT "Democrats are fighting our fishing regulations in court" — complete assertion.
+- The context field must explain what the full post/speech was about so a fact-checker understands it.
 - Exclude pure rhetoric with no factual content ("we will win", "it's a disaster").
 - Exclude attacks naming specific private individuals.
 - Include borderline cases — the editor will rate relevance via feedback.
