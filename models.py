@@ -105,16 +105,39 @@ def init_db():
     c.execute("""
         CREATE TABLE IF NOT EXISTS claim_feedback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            claim_id INTEGER NOT NULL,
+            claim_id INTEGER NOT NULL UNIQUE,
             claim_text TEXT NOT NULL,
             claim_type TEXT,
             context TEXT,
-            rating INTEGER NOT NULL,  -- 1=relevant, -1=not relevant
+            rating INTEGER,           -- 1=relevant, -1=not relevant, NULL=comment only
+            comment TEXT,             -- editor's note explaining the rating
+            sub_claim TEXT,           -- optional sub-claim to queue for checking
             rated_by TEXT,
             rated_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (claim_id) REFERENCES claims(id)
         )
     """)
+    # Add comment/sub_claim columns if upgrading
+    for col in ["comment TEXT", "sub_claim TEXT"]:
+        try:
+            c.execute(f"ALTER TABLE claim_feedback ADD COLUMN {col}")
+        except:
+            pass
+    # Sub-claims queued by editor for fact-checking
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS sub_claim_queue (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_claim_id INTEGER NOT NULL,
+            sub_claim_text TEXT NOT NULL,
+            source_url TEXT,
+            source_title TEXT,
+            politician_id INTEGER,
+            status TEXT DEFAULT 'pending',  -- pending / checked
+            queued_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (parent_claim_id) REFERENCES claims(id)
+        )
+    """)
+
     # Add significance columns to claims if upgrading
     for col in ["significance", "significance_reason", "user_rating"]:
         try:

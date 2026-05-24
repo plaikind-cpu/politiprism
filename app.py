@@ -481,13 +481,30 @@ def clear_all():
 
 # ── Feedback & learning ──────────────────────────────────────────────────────
 
-@app.route("/feedback/<int:claim_id>/<int:rating>")
-def submit_feedback(claim_id, rating):
-    """rating: 1=relevant, -1=not relevant"""
-    if rating not in (1, -1):
+@app.route("/feedback", methods=["POST"])
+def submit_feedback():
+    """
+    Accepts JSON: { claim_id, rating (1/-1/0), comment, sub_claim }
+    rating 0 = comment only, no binary rating
+    """
+    data      = request.get_json(silent=True) or {}
+    claim_id  = data.get("claim_id")
+    rating    = data.get("rating")     # 1, -1, or None
+    comment   = data.get("comment", "").strip() or None
+    sub_claim = data.get("sub_claim", "").strip() or None
+
+    if not claim_id:
+        return jsonify({"error": "missing claim_id"}), 400
+    if rating not in (1, -1, None):
         return jsonify({"error": "invalid rating"}), 400
-    success = store_feedback(claim_id, rating, rated_by=session.get("user_email"))
-    return jsonify({"ok": success, "claim_id": claim_id, "rating": rating})
+
+    success = store_feedback(
+        claim_id, rating,
+        comment=comment,
+        sub_claim=sub_claim,
+        rated_by=session.get("user_email", "admin")
+    )
+    return jsonify({"ok": success, "claim_id": claim_id})
 
 @app.route("/learning")
 @require_login
