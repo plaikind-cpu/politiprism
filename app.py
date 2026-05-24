@@ -480,6 +480,20 @@ def clear_all():
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 
+
+# ── ONE-TIME SETUP — REMOVE AFTER USE ────────────────────────────────────────
+@app.route("/setup-admin")
+def setup_password():
+    import bcrypt
+    password = "PolitiPrism2026!"
+    hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    conn = get_db()
+    conn.execute("UPDATE users SET password_hash = ? WHERE email = ?",
+                 (hashed, ADMIN_EMAIL))
+    conn.commit()
+    conn.close()
+    return f"Password set for {ADMIN_EMAIL}. Login with: PolitiPrism2026!", 200
+
 init_db()
 
 # Seed admin user
