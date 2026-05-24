@@ -4,6 +4,7 @@ import json
 import anthropic
 from models import get_db
 from ingestion import brave_news_search
+from learning import get_feedback_examples
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -105,15 +106,37 @@ Strict rules:
         print(f"    Quote extraction error: {e}")
         return []
 
-# ── Change 2b: Claim scoring ──────────────────────────────────────────────────
+# ── Change 2b: Claim scoring with significance + learning ────────────────────
 
 def score_claim(raw_quote, context):
     """
-    Step 2b: Score each extracted quote. Only verifiable claims with
-    no reject_reason proceed to Brave Search + verdict.
+    Step 2b: Score each extracted quote for both verifiability AND
+    editorial significance. Uses feedback examples when available.
     """
-    prompt = f"""You are evaluating whether a politician's statement contains a verifiable factual claim.
+    examples_block, example_count = get_feedback_examples(limit=30)
 
+    if examples_block:
+        learning_section = f"""
+EDITORIAL LEARNING — {example_count} past ratings from the editor:
+{examples_block}
+
+Use these examples to calibrate your significance judgment.
+The editor cares about policy implications, factual accuracy on matters of public record,
+and claims that affect democratic accountability. They do NOT care about scheduling,
+personal activities, social observations, or self-referential statements.
+"""
+    else:
+        learning_section = """
+SIGNIFICANCE GUIDANCE (no editor ratings yet — use defaults):
+- HIGH: policy assertions, military/economic facts, historical claims, legal facts
+- MEDIUM: verifiable public events with political implications
+- LOW: scheduling, personal whereabouts, social observations, self-referential statements
+"""
+
+    prompt = f"""You are a senior political fact-checker evaluating whether a politician's
+statement is worth fact-checking.
+{learning_section}
+Now evaluate this new claim:
 Statement: "{raw_quote}"
 Context: "{context}"
 
@@ -123,28 +146,22 @@ Return JSON only:
   "specific_entity": "the person, place, number, or event being asserted (or null)",
   "specific_value": "the specific thing being claimed about it (or null)",
   "verifiable": true or false,
+  "significance": "high" or "medium" or "low",
+  "significance_reason": "one sentence: why this does or does not matter for public accountability",
   "search_query": "a 6-10 word web search that would find confirming or refuting evidence (or null)",
-  "reject_reason": null or "opinion" or "vague" or "prediction" or "third_party_accusation" or "unverifiable"
+  "reject_reason": null or "opinion" or "vague" or "prediction" or "third_party_accusation" or "low_significance" or "unverifiable"
 }}
 
-Rules:
-- "verifiable" is true only if a search engine could plausibly return evidence that 
-  directly confirms or refutes the claim.
-- If specific_entity or specific_value are null, set verifiable to false.
-- opinion, vague, prediction, and third_party_accusation always get a non-null reject_reason.
-- "The best ever" or "nobody has done more" = opinion unless it names a specific measurable metric.
-- Statistical claims must include an actual number to be verifiable.
-- "We have the best economy" = opinion, reject.
-- "Unemployment is 3.9%" = statistical_claim, verifiable.
-- Election results, vote tallies, legislative votes, and public records ARE verifiable even without a specific number.
-- For search_query: be specific and factual. Use the actual names, numbers, and topics in the claim.
-  Example: "Trump won North Carolina 6 times" → search_query: "Trump North Carolina election results primaries wins"
-  Example: "Trump $10 billion IRS lawsuit settlement" → search_query: "Trump IRS lawsuit 10 billion settlement dropped"
-  Example: "Kyle Busch NASCAR all time wins record" → search_query: "Kyle Busch NASCAR wins all time record"
-- Never use vague search queries like "fact check Trump statement" — always include the specific subject matter."""
+Hard rules (always apply regardless of significance):
+- If verifiable is false, set reject_reason to "unverifiable"
+- opinion, vague, prediction, third_party_accusation always get reject_reason
+- "low" significance always gets reject_reason "low_significance"
+- Scheduling reports ("I had a call", "I am in the Oval Office") = low significance
+- Election results, legislative votes, public records ARE verifiable
+- For search_query: use specific names, numbers, topics — never vague queries"""
 
     try:
-        raw = call_claude(prompt, max_tokens=300)
+        raw = call_claude(prompt, max_tokens=400)
         return json.loads(raw)
     except Exception as e:
         print(f"    Claim scoring error: {e}")
@@ -312,11 +329,14 @@ def process_statement(statement, date_str):
 
         conn.execute("""
             INSERT INTO claims
-                (statement_id, claim_text, verdict, confidence, explanation, citations, checked_at)
-            VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                (statement_id, claim_text, verdict, confidence, explanation,
+                 citations, checked_at, significance, significance_reason)
+            VALUES (?, ?, ?, ?, ?, ?, datetime('now'), ?, ?)
         """, (statement_id, raw_quote, verdict,
               verdict_data.get("confidence", "LOW"), summary,
-              json.dumps(verdict_data.get("citations", []))))
+              json.dumps(verdict_data.get("citations", [])),
+              score.get("significance", "medium"),
+              score.get("significance_reason", "")))
         conn.commit()
 
         # Register in claim registry

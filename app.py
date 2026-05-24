@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
 from models import init_db, get_db
 from scheduler import start_scheduler, run_daily_pipeline
+from learning import store_feedback, get_learning_stats
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -477,6 +478,25 @@ def clear_all():
     conn.close()
     flash("All claims and statements cleared. Politicians and users preserved.")
     return redirect(url_for("admin"))
+
+# ── Feedback & learning ──────────────────────────────────────────────────────
+
+@app.route("/feedback/<int:claim_id>/<int:rating>")
+@require_login
+def submit_feedback(claim_id, rating):
+    """rating: 1=relevant, -1=not relevant"""
+    if rating not in (1, -1):
+        return jsonify({"error": "invalid rating"}), 400
+    success = store_feedback(claim_id, rating, rated_by=session.get("user_email"))
+    return jsonify({"ok": success, "claim_id": claim_id, "rating": rating})
+
+@app.route("/learning")
+@require_login
+def learning_dashboard():
+    if not is_admin():
+        return "Access denied.", 403
+    stats = get_learning_stats()
+    return render_template("learning.html", stats=stats)
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 

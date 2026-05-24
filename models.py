@@ -101,6 +101,27 @@ def init_db():
         )
     """)
 
+    # User feedback on claim relevance — drives learning loop
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS claim_feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            claim_id INTEGER NOT NULL,
+            claim_text TEXT NOT NULL,
+            claim_type TEXT,
+            context TEXT,
+            rating INTEGER NOT NULL,  -- 1=relevant, -1=not relevant
+            rated_by TEXT,
+            rated_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (claim_id) REFERENCES claims(id)
+        )
+    """)
+    # Add significance columns to claims if upgrading
+    for col in ["significance", "significance_reason", "user_rating"]:
+        try:
+            c.execute(f"ALTER TABLE claims ADD COLUMN {col} TEXT")
+        except:
+            pass
+
     # Seed default politicians if table is empty
     c.execute("SELECT COUNT(*) FROM politicians")
     if c.fetchone()[0] == 0:
