@@ -1,5 +1,19 @@
 {% extends "base.html" %}
-{% block title %}PolitiPrism — Daily Digest{% endblock %}
+{% block title %}PolitiPrism — Daily Digest<script>
+function sendFeedback(claimId, rating, btn) {
+    fetch(`/feedback/${claimId}/${rating}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) {
+                var yesBtn = document.getElementById('fb-yes-' + claimId);
+                var noBtn  = document.getElementById('fb-no-'  + claimId);
+                yesBtn.className = 'fb-btn' + (rating === 1  ? ' active-relevant' : '');
+                noBtn.className  = 'fb-btn' + (rating === -1 ? ' active-not' : '');
+            }
+        });
+}
+</script>
+{% endblock %}
 {% block extra_styles %}
 .date-nav { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
 .date-nav input[type=date] { background: #1a1d2e; border: 1px solid #3a3d5c;
@@ -64,6 +78,17 @@
                margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .citations a:hover { text-decoration: underline; }
 .empty-state { text-align: center; color: #9d9db5; padding: 60px 0; font-size: 0.95rem; }
+.feedback-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.fb-btn { background: none; border: 1px solid #2e3150; border-radius: 20px;
+          padding: 3px 12px; font-size: 0.8rem; cursor: pointer; color: #9d9db5;
+          transition: all 0.2s; }
+.fb-btn:hover { border-color: #6c63ff; color: #c8bfff; }
+.fb-btn.active-relevant { background: #1e3d2a; border-color: #4caf73; color: #4caf73; }
+.fb-btn.active-not { background: #3d1e1e; border-color: #e05c5c; color: #e05c5c; }
+.fb-label { font-size: 0.75rem; color: #9d9db5; }
+.sig-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+.sig-high   { background: #1e2a3d; color: #6ca0ff; }
+.sig-medium { background: #2a2a1e; color: #c8a040; }
 
 /* ── Print / PDF styles ── */
 @media print {
@@ -253,6 +278,20 @@
                     📰 {{ claim.source_title or claim.source_url }}
                 {% endif %}
             </a>
+        {% endif %}
+        {% if is_admin %}
+        <div class="feedback-row no-print">
+            <span class="fb-label">Relevant to fact-check?</span>
+            <button class="fb-btn {% if claim.user_rating == 'relevant' %}active-relevant{% endif %}"
+                    onclick="sendFeedback({{ claim.id }}, 1, this)"
+                    id="fb-yes-{{ claim.id }}">👍 Yes</button>
+            <button class="fb-btn {% if claim.user_rating == 'not_relevant' %}active-not{% endif %}"
+                    onclick="sendFeedback({{ claim.id }}, -1, this)"
+                    id="fb-no-{{ claim.id }}">👎 No</button>
+            {% if claim.significance %}
+                <span class="sig-badge sig-{{ claim.significance }}">{{ claim.significance }} significance</span>
+            {% endif %}
+        </div>
         {% endif %}
         {% if claim.citations %}
         <div class="citations">
