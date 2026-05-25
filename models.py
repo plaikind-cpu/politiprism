@@ -117,7 +117,41 @@ def init_db():
             FOREIGN KEY (claim_id) REFERENCES claims(id)
         )
     """)
-    # Add unique index on claim_text for feedback dedup (not claim_id)
+    # Migrate claim_feedback — remove UNIQUE constraint on claim_id, use claim_text instead
+    try:
+        # Check if old constraint exists by trying to insert two rows with same claim_id
+        c.execute("INSERT INTO claim_feedback (claim_id, claim_text, rating) VALUES (0, '__test1__', 1)")
+        c.execute("INSERT INTO claim_feedback (claim_id, claim_text, rating) VALUES (0, '__test2__', 1)")
+        c.execute("DELETE FROM claim_feedback WHERE claim_text IN ('__test1__', '__test2__')")
+        # If we got here, no UNIQUE on claim_id — good
+    except Exception:
+        # UNIQUE constraint on claim_id exists — migrate the table
+        print("Migrating claim_feedback table to remove claim_id UNIQUE constraint...")
+        c.execute("ALTER TABLE claim_feedback RENAME TO claim_feedback_old")
+        c.execute("""
+            CREATE TABLE claim_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                claim_id INTEGER NOT NULL,
+                claim_text TEXT NOT NULL UNIQUE,
+                claim_type TEXT,
+                context TEXT,
+                rating INTEGER,
+                comment TEXT,
+                sub_claim TEXT,
+                rated_by TEXT,
+                rated_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        c.execute("""
+            INSERT OR IGNORE INTO claim_feedback
+                (claim_id, claim_text, claim_type, context, rating, comment, sub_claim, rated_by, rated_at)
+            SELECT claim_id, claim_text, claim_type, context, rating, comment, sub_claim, rated_by, rated_at
+            FROM claim_feedback_old
+        """)
+        c.execute("DROP TABLE claim_feedback_old")
+        print("Migration complete.")
+
+    # Ensure unique index on claim_text
     try:
         c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_claim_text ON claim_feedback(claim_text)")
     except:
