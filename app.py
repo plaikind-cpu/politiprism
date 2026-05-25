@@ -600,7 +600,7 @@ def learning_dashboard():
     if not is_admin():
         return "Access denied.", 403
     stats = get_learning_stats()
-    return render_template("learning.html", stats=stats)
+    return render_template("learning.html", stats=stats, is_admin=is_admin())
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 
