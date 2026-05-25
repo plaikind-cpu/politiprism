@@ -586,7 +586,16 @@ def import_politifact():
 @app.route("/admin/pf-import-status")
 @require_login
 def pf_import_status():
-    return jsonify(_pf_import_status)
+    from models import get_db
+    conn = get_db()
+    pf_count = conn.execute(
+        "SELECT COUNT(*) FROM claim_feedback WHERE rated_by = 'politifact_import'"
+    ).fetchone()[0]
+    conn.close()
+    status = dict(_pf_import_status)
+    status["db_pf_count"] = pf_count
+    status["db_path"] = os.environ.get("DB_PATH", "/tmp/politiprism.db")
+    return jsonify(status)
 
 # ── Feedback & learning ───────────────────────────────────────────────────────
 
