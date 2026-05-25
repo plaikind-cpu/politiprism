@@ -15,10 +15,12 @@ def get_feedback_examples(limit=30):
     """
     conn = get_db()
     rows = conn.execute("""
-        SELECT claim_text, claim_type, context, rating, comment
+        SELECT claim_text, claim_type, context, rating, comment, rated_by
         FROM claim_feedback
         WHERE rating IS NOT NULL OR comment IS NOT NULL
-        ORDER BY rated_at DESC
+        ORDER BY
+            CASE WHEN rated_by = 'politifact_import' THEN 1 ELSE 0 END,
+            rated_at DESC
         LIMIT ?
     """, (limit,)).fetchall()
     conn.close()
@@ -68,6 +70,9 @@ def get_learning_stats():
     ).fetchone()[0]
     total_commented = conn.execute(
         "SELECT COUNT(*) FROM claim_feedback WHERE comment IS NOT NULL AND comment != ''"
+    ).fetchone()[0]
+    pf_seeds = conn.execute(
+        "SELECT COUNT(*) FROM claim_feedback WHERE rated_by = 'politifact_import'"
     ).fetchone()[0]
     relevant      = conn.execute(
         "SELECT COUNT(*) FROM claim_feedback WHERE rating = 1"

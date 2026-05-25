@@ -5,6 +5,8 @@ import requests
 from datetime import datetime, timedelta, timezone
 from models import get_db
 
+from politifact import ingest_politifact
+
 BRAVE_API_KEY = os.environ.get("BRAVE_API_KEY")
 BRAVE_NEWS_URL = "https://api.search.brave.com/res/v1/news/search"
 
@@ -218,16 +220,18 @@ def fetch_truth_social(politician):
 
 def fetch_statements_for_politician(politician):
     """
-    Three sources in priority order:
-    1. whitehouse.gov/remarks  — official transcripts (ground truth)
-    2. trumpstruth.org RSS     — Truth Social posts (direct Trump words)
-    3. Brave News              — press pool quotes from interviews/gaggles
+    Four sources in priority order:
+    1. PolitiFact              — editorially curated, pre-verified claims (best signal)
+    2. whitehouse.gov/remarks  — official transcripts (ground truth)
+    3. trumpstruth.org RSS     — Truth Social posts (direct Trump words)
+    4. Brave News              — press pool quotes from interviews/gaggles
     """
+    pf_count   = ingest_politifact(politician)
     wh_count   = fetch_wh_remarks_today(politician)
     ts_count   = fetch_truth_social(politician)
     news_count = fetch_news_quotes(politician)
-    print(f"  Sources: {wh_count} WH transcripts + {ts_count} Truth Social + {news_count} news articles")
-    return wh_count + ts_count + news_count
+    print(f"  Sources: {pf_count} PolitiFact + {wh_count} WH transcripts + {ts_count} Truth Social + {news_count} news articles")
+    return pf_count + wh_count + ts_count + news_count
 
 # ── Brave News helper ─────────────────────────────────────────────────────────
 

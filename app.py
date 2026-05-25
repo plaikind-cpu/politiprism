@@ -551,7 +551,23 @@ def clear_all():
     flash("All claims and statements cleared. Politicians and users preserved.")
     return redirect(url_for("admin"))
 
-# ── Feedback & learning ──────────────────────────────────────────────────────
+# ── PolitiFact bulk import ───────────────────────────────────────────────────
+
+@app.route("/admin/import-politifact")
+@require_login
+def import_politifact():
+    if not is_admin():
+        return "Access denied.", 403
+    import threading
+    from politifact import bulk_import_training_data
+    def run():
+        count = bulk_import_training_data(days_back=90, max_items=100)
+        print(f"PolitiFact bulk import complete: {count} examples")
+    threading.Thread(target=run, daemon=True).start()
+    flash("PolitiFact bulk import started — importing up to 100 recent fact-checks as training examples.")
+    return redirect(url_for("admin"))
+
+# ── Feedback & learning ───────────────────────────────────────────────────────
 
 @app.route("/feedback", methods=["POST"])
 def submit_feedback():
