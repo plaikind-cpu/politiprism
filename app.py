@@ -553,19 +553,40 @@ def clear_all():
 
 # ── PolitiFact bulk import ───────────────────────────────────────────────────
 
+# Simple in-memory status for PolitiFact import (resets on restart, that's fine)
+_pf_import_status = {"running": False, "imported": 0, "found": 0, "stage": "idle"}
+
 @app.route("/admin/import-politifact")
 @require_login
 def import_politifact():
     if not is_admin():
         return "Access denied.", 403
+    if _pf_import_status["running"]:
+        flash("Import already running — check the progress indicator.")
+        return redirect(url_for("admin"))
     import threading
     from politifact import bulk_import_training_data
     def run():
-        count = bulk_import_training_data(days_back=90, max_items=100)
-        print(f"PolitiFact bulk import complete: {count} examples")
+        global _pf_import_status
+        _pf_import_status = {"running": True, "imported": 0, "found": 0, "stage": "Fetching from PolitiFact..."}
+        try:
+            count = bulk_import_training_data(
+                days_back=None, max_items=200,
+                status_callback=lambda s: _pf_import_status.update(s)
+            )
+            _pf_import_status = {"running": False, "imported": count, "found": count,
+                                  "stage": f"Complete — {count} training examples imported"}
+            print(f"PolitiFact bulk import complete: {count} examples")
+        except Exception as e:
+            _pf_import_status = {"running": False, "imported": 0, "found": 0,
+                                  "stage": f"Error: {str(e)}"}
     threading.Thread(target=run, daemon=True).start()
-    flash("PolitiFact bulk import started — importing up to 100 recent fact-checks as training examples.")
     return redirect(url_for("admin"))
+
+@app.route("/admin/pf-import-status")
+@require_login
+def pf_import_status():
+    return jsonify(_pf_import_status)
 
 # ── Feedback & learning ───────────────────────────────────────────────────────
 

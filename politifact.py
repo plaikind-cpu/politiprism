@@ -99,43 +99,60 @@ def parse_statements(html):
 
     return results[:20]  # cap per ruling type
 
-def fetch_all_checks(days_back=90, max_per_ruling=15):
+def fetch_all_checks(days_back=None, max_per_ruling=15, max_pages=5):
     """
-    Fetch fact-checks across all ruling types.
-    Returns list of dicts with statement, verdict, ruling_label, date, context.
+    Fetch fact-checks across all ruling types with pagination.
+    days_back=None means no date filter (get all available).
     """
-    since = datetime.now(timezone.utc) - timedelta(days=days_back)
+    since = (datetime.now(timezone.utc) - timedelta(days=days_back)) if days_back else None
     all_checks = []
     seen_statements = set()
 
-    for ruling, verdict, url in RULING_URLS:
+    for ruling, verdict, base_url in RULING_URLS:
         label = RULING_LABEL[ruling]
-        print(f"    Fetching PolitiFact [{label}]...")
-        items = fetch_ruling_page(url)
+        ruling_count = 0
 
-        for item in items[:max_per_ruling]:
-            stmt = item["statement"]
-            if stmt in seen_statements:
-                continue
+        for page in range(1, max_pages + 1):
+            url = base_url if page == 1 else base_url + f"&page={page}"
+            print(f"    Fetching PolitiFact [{label}] page {page}...")
+            items = fetch_ruling_page(url)
 
-            # Parse date for filtering
-            try:
-                dt = datetime.strptime(item["date"], "%B %d, %Y").replace(tzinfo=timezone.utc)
-                if dt < since:
+            if not items:
+                break  # no more pages
+
+            added_this_page = 0
+            for item in items:
+                stmt = item["statement"]
+                if stmt in seen_statements:
                     continue
-            except:
-                pass  # include if date parse fails
 
-            seen_statements.add(stmt)
-            all_checks.append({
-                "statement":    stmt,
-                "ruling":       ruling,
-                "ruling_label": label,
-                "verdict":      verdict,
-                "date":         item["date"],
-                "context":      item["context"],
-                "url":          url,
-            })
+                # Date filter if specified
+                if since:
+                    try:
+                        dt = datetime.strptime(item["date"], "%B %d, %Y").replace(tzinfo=timezone.utc)
+                        if dt < since:
+                            continue
+                    except:
+                        pass
+
+                seen_statements.add(stmt)
+                all_checks.append({
+                    "statement":    stmt,
+                    "ruling":       ruling,
+                    "ruling_label": label,
+                    "verdict":      verdict,
+                    "date":         item["date"],
+                    "context":      item["context"],
+                    "url":          url,
+                })
+                ruling_count += 1
+                added_this_page += 1
+
+                if ruling_count >= max_per_ruling:
+                    break
+
+            if ruling_count >= max_per_ruling or added_this_page == 0:
+                break
 
     print(f"    PolitiFact: parsed {len(all_checks)} total checks")
     return all_checks
@@ -148,19 +165,29 @@ def ingest_politifact(politician):
     if "trump" not in politician["name"].lower():
         return 0
 
-    print("  Fetching PolitiFact checks (last 7 days)...")
-    checks = fetch_all_checks(days_back=7, max_per_ruling=5)
+    print("  Fetching PolitiFact checks (last 14 days)...")
+    checks = fetch_all_checks(days_back=14, max_per_ruling=5, max_pages=2)
     print(f"  PolitiFact daily: {len(checks)} checks found")
 
     return _store_checks(checks, politician)
 
-def bulk_import_training_data(days_back=90, max_items=100):
+def bulk_import_training_data(days_back=None, max_items=200, status_callback=None):
     """
     One-time bulk import of PolitiFact historical checks as training examples.
+    days_back=None fetches all available (up to max_pages per ruling type).
+    status_callback: optional fn(dict) called with progress updates.
     """
-    print(f"Bulk importing PolitiFact training data (last {days_back} days)...")
-    checks = fetch_all_checks(days_back=days_back, max_per_ruling=20)
-    print(f"Found {len(checks)} checks to import")
+    def update(stage, imported=0, found=0):
+        if status_callback:
+            status_callback({"running": True, "stage": stage,
+                             "imported": imported, "found": found})
+
+    print(f"Bulk importing PolitiFact training data...")
+    update("Fetching from PolitiFact pages...")
+    checks = fetch_all_checks(days_back=days_back, max_per_ruling=40, max_pages=5)
+    total = len(checks)
+    print(f"Found {total} checks to import")
+    update(f"Found {total} checks — storing...", found=total)
 
     conn = get_db()
     imported = 0
@@ -206,6 +233,9 @@ def bulk_import_training_data(days_back=90, max_items=100):
         ))
         conn.commit()
         imported += 1
+        if imported % 5 == 0:
+            update(f"Storing examples... {imported}/{min(total, max_items)}", 
+                   imported=imported, found=total)
 
     conn.close()
     print(f"Imported {imported} PolitiFact training examples")
