@@ -191,7 +191,7 @@ def bulk_import_training_data(days_back=90, max_items=100):
         conn.commit()
 
         # Also pre-seed claim_registry
-        from learning import fingerprint as fp_fn
+        from factcheck import fingerprint as fp_fn
         fp = fp_fn(stmt)
         conn.execute("""
             INSERT OR IGNORE INTO claim_registry
@@ -244,7 +244,7 @@ def _store_checks(checks, politician):
         conn.commit()
 
         # Pre-seed claim_registry
-        from learning import fingerprint as fp_fn
+        from factcheck import fingerprint as fp_fn
         fp = fp_fn(stmt)
         conn.execute("""
             INSERT OR IGNORE INTO claim_registry
