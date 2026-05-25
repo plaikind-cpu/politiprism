@@ -105,7 +105,7 @@ def init_db():
     c.execute("""
         CREATE TABLE IF NOT EXISTS claim_feedback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            claim_id INTEGER NOT NULL UNIQUE,
+            claim_id INTEGER NOT NULL,
             claim_text TEXT NOT NULL,
             claim_type TEXT,
             context TEXT,
@@ -117,6 +117,12 @@ def init_db():
             FOREIGN KEY (claim_id) REFERENCES claims(id)
         )
     """)
+    # Add unique index on claim_text for feedback dedup (not claim_id)
+    try:
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_feedback_claim_text ON claim_feedback(claim_text)")
+    except:
+        pass
+
     # Add comment/sub_claim columns if upgrading
     for col in ["comment TEXT", "sub_claim TEXT"]:
         try:

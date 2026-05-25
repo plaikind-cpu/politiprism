@@ -144,7 +144,7 @@ def store_feedback(claim_id, rating, comment=None, sub_claim=None, rated_by="adm
         INSERT INTO claim_feedback
             (claim_id, claim_text, claim_type, context, rating, comment, sub_claim, rated_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(claim_id) DO UPDATE SET
+        ON CONFLICT(claim_text) DO UPDATE SET
             rating    = excluded.rating,
             comment   = excluded.comment,
             sub_claim = excluded.sub_claim,

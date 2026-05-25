@@ -176,9 +176,10 @@ def bulk_import_training_data(days_back=90, max_items=100):
             continue
 
         conn.execute("""
-            INSERT OR IGNORE INTO claim_feedback
+            INSERT INTO claim_feedback
                 (claim_id, claim_text, claim_type, context, rating, comment, rated_by)
             VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(claim_text) DO NOTHING
         """, (
             0,
             stmt,
