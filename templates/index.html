@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PKL Admin — Media Lab Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #0d1b2a;
+  --navy2: #112236;
+  --navy3: #152b42;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #e8edf2;
+  --muted: #7a90a4;
+  --dim: #4a6070;
+  --tp: #4a9eff;
+  --tp-bg: rgba(74,158,255,0.1);
+  --tp-border: rgba(74,158,255,0.25);
+  --nd: #3ec97a;
+  --nd-bg: rgba(62,201,122,0.1);
+  --nd-border: rgba(62,201,122,0.25);
+  --sp: #f5a623;
+  --sp-bg: rgba(245,166,35,0.1);
+  --sp-border: rgba(245,166,35,0.25);
+  --danger: #e05555;
+  --danger-bg: rgba(224,85,85,0.1);
+  --success: #3ec97a;
+  --radius: 10px;
+  --mono: 'DM Mono', monospace;
+  --sans: 'Syne', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--navy); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; }
+
+/* ── layout ── */
+.shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+.sidebar { background: var(--navy2); border-right: 1px solid var(--border); padding: 28px 0; display: flex; flex-direction: column; }
+.main { padding: 32px 36px; overflow-y: auto; }
+
+/* ── sidebar ── */
+.brand { padding: 0 22px 28px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+.brand-name { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.brand-sub { font-size: 11px; color: var(--dim); margin-top: 2px; font-family: var(--mono); }
+
+.sidebar-section { padding: 0 12px; margin-bottom: 6px; }
+.section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); padding: 6px 10px; }
+.app-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 7px; border: none; background: none; color: var(--muted); cursor: pointer; font-family: var(--sans); font-size: 13px; font-weight: 500; text-align: left; transition: background 0.15s, color 0.15s; }
+.app-btn:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+.app-btn.active { color: var(--text); background: rgba(255,255,255,0.06); }
+.app-btn.active.tp { color: var(--tp); background: var(--tp-bg); }
+.app-btn.active.nd { color: var(--nd); background: var(--nd-bg); }
+.app-btn.active.sp { color: var(--sp); background: var(--sp-bg); }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-tp { background: var(--tp); }
+.dot-nd { background: var(--nd); }
+.dot-sp { background: var(--sp); }
+.dot-all { background: linear-gradient(135deg, var(--tp) 0%, var(--nd) 50%, var(--sp) 100%); }
+
+.sidebar-footer { margin-top: auto; padding: 18px 22px 0; border-top: 1px solid var(--border); }
+.login-area label { font-size: 11px; color: var(--dim); display: block; margin-bottom: 4px; font-family: var(--mono); }
+.login-area input { width: 100%; background: var(--navy3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 7px 10px; font-family: var(--mono); font-size: 12px; outline: none; transition: border 0.15s; }
+.login-area input:focus { border-color: var(--border2); }
+.login-btn { width: 100%; margin-top: 8px; padding: 8px; background: var(--navy3); border: 1px solid var(--border2); border-radius: 7px; color: var(--text); font-family: var(--sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+.login-btn:hover { background: rgba(255,255,255,0.07); }
+
+/* ── page header ── */
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+.page-title { font-size: 22px; font-weight: 600; }
+.page-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.refresh-btn { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: var(--navy3); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); font-family: var(--sans); font-size: 13px; cursor: pointer; transition: background 0.15s; }
+.refresh-btn:hover { background: rgba(255,255,255,0.07); }
+.refresh-btn svg { width: 14px; height: 14px; }
+
+/* ── stats row ── */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+.stat-card { background: var(--navy2); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
+.stat-label { font-size: 11px; color: var(--dim); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+.stat-val { font-size: 28px; font-weight: 600; line-height: 1; }
+.stat-change { font-size: 11px; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+
+/* ── app panels ── */
+.panels { display: flex; flex-direction: column; gap: 20px; }
+.panel { background: var(--navy2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.panel-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.panel-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; }
+.panel-actions { display: flex; align-items: center; gap: 8px; }
+.badge { font-size: 11px; font-family: var(--mono); padding: 3px 9px; border-radius: 100px; font-weight: 500; }
+.badge-tp { background: var(--tp-bg); color: var(--tp); border: 1px solid var(--tp-border); }
+.badge-nd { background: var(--nd-bg); color: var(--nd); border: 1px solid var(--nd-border); }
+.badge-sp { background: var(--sp-bg); color: var(--sp); border: 1px solid var(--sp-border); }
+.badge-ok { background: rgba(62,201,122,0.12); color: var(--success); }
+.badge-err { background: var(--danger-bg); color: var(--danger); }
+.badge-loading { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+.small-btn { padding: 5px 12px; background: var(--navy3); border: 1px solid var(--border2); border-radius: 6px; color: var(--muted); font-family: var(--sans); font-size: 12px; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+.small-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+/* ── password row inside panel ── */
+.pw-row { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.15); }
+.pw-row label { font-size: 11px; color: var(--dim); font-family: var(--mono); white-space: nowrap; }
+.pw-row input { flex: 1; max-width: 260px; background: var(--navy3); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 6px 10px; font-family: var(--mono); font-size: 12px; outline: none; }
+.pw-row input:focus { border-color: var(--border2); }
+.fetch-btn { padding: 6px 14px; background: var(--navy3); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.15s; white-space: nowrap; }
+.fetch-btn:hover { background: rgba(255,255,255,0.07); }
+
+/* ── code table ── */
+.codes-wrap { padding: 4px 0; }
+.codes-table { width: 100%; border-collapse: collapse; }
+.codes-table th { font-size: 10px; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); padding: 10px 20px; text-align: left; border-bottom: 1px solid var(--border); }
+.codes-table td { padding: 11px 20px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; vertical-align: middle; }
+.codes-table tr:last-child td { border-bottom: none; }
+.codes-table tr:hover td { background: rgba(255,255,255,0.02); }
+.code-pill { font-family: var(--mono); font-size: 12px; background: var(--navy3); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; cursor: pointer; color: var(--text); transition: border-color 0.15s; }
+.code-pill:hover { border-color: var(--border2); }
+.status-active { color: var(--success); font-family: var(--mono); font-size: 12px; }
+.status-inactive { color: var(--dim); font-family: var(--mono); font-size: 12px; }
+.uses-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.uses-bar-bg { flex: 1; max-width: 80px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.uses-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+.uses-num { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.action-row { display: flex; gap: 6px; }
+.act-btn { padding: 4px 10px; background: none; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-family: var(--sans); font-size: 11px; cursor: pointer; transition: all 0.15s; }
+.act-btn:hover { border-color: var(--border2); color: var(--text); }
+.act-btn.danger:hover { border-color: rgba(224,85,85,0.4); color: var(--danger); }
+
+/* ── create form ── */
+.create-form { padding: 16px 20px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.1); }
+.create-form h4 { font-size: 12px; font-family: var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }
+.form-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.form-field { display: flex; flex-direction: column; gap: 4px; }
+.form-field label { font-size: 11px; color: var(--dim); font-family: var(--mono); }
+.form-field input { background: var(--navy); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 7px 10px; font-family: var(--mono); font-size: 12px; outline: none; }
+.form-field input:focus { border-color: var(--border2); }
+.form-field input.w-lg { width: 180px; }
+.form-field input.w-md { width: 130px; }
+.form-field input.w-sm { width: 80px; }
+.create-btn { padding: 7px 16px; background: var(--navy); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; align-self: flex-end; transition: background 0.15s; white-space: nowrap; }
+.create-btn:hover { background: rgba(255,255,255,0.06); }
+
+/* ── empty / loading states ── */
+.empty-state { padding: 40px 20px; text-align: center; color: var(--dim); font-size: 13px; }
+.spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--muted); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error-msg { padding: 20px; color: var(--danger); font-size: 13px; font-family: var(--mono); }
+
+/* ── toast ── */
+#toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy3); border: 1px solid var(--border2); border-radius: 8px; padding: 12px 18px; font-size: 13px; color: var(--text); opacity: 0; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 999; }
+#toast.show { opacity: 1; transform: translateY(0); }
+
+/* ── login gate ── */
+#login-gate { position: fixed; inset: 0; background: var(--navy); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.login-box { background: var(--navy2); border: 1px solid var(--border); border-radius: 14px; padding: 40px; width: 360px; text-align: center; }
+.login-box h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.login-box p { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+.login-box input { width: 100%; background: var(--navy3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 11px 14px; font-family: var(--mono); font-size: 14px; outline: none; text-align: center; margin-bottom: 12px; }
+.login-box input:focus { border-color: var(--border2); }
+.login-box button { width: 100%; padding: 11px; background: var(--navy3); border: 1px solid var(--border2); border-radius: 8px; color: var(--text); font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+.login-box button:hover { background: rgba(255,255,255,0.06); }
+.login-err { font-size: 12px; color: var(--danger); margin-top: 8px; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<!-- Login gate -->
+<div id="login-gate">
+  <div class="login-box">
+    <div style="font-size:28px; margin-bottom:14px;">🔐</div>
+    <h1>PKL Admin</h1>
+    <p>Enter your dashboard password to continue</p>
+    <input type="password" id="gate-pw" placeholder="Dashboard password" onkeydown="if(event.key==='Enter') doLogin()">
+    <button onclick="doLogin()">Sign in</button>
+    <div class="login-err" id="gate-err"></div>
+  </div>
+</div>
+
+<!-- Main shell -->
+<div class="shell" id="app-shell" style="display:none;">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-name">PKL Media Lab</div>
+      <div class="brand-sub">Admin Dashboard</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="section-label">Apps</div>
+      <button class="app-btn active" id="nav-all" onclick="showView('all')">
+        <span class="dot dot-all"></span> All apps
+      </button>
+      <button class="app-btn" id="nav-tp" onclick="showView('tp')">
+        <span class="dot dot-tp"></span> TruthPrism
+      </button>
+      <button class="app-btn" id="nav-nd" onclick="showView('nd')">
+        <span class="dot dot-nd"></span> News-Distiller
+      </button>
+      <button class="app-btn" id="nav-sp" onclick="showView('sp')">
+        <span class="dot dot-sp"></span> ScamPrism
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="login-area" style="margin-bottom:16px;">
+        <label>Dashboard password</label>
+        <input type="password" id="dash-pw-display" disabled style="opacity:0.4;">
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:14px;">
+        <div style="font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--dim);margin-bottom:10px;">Cost per use</div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:var(--muted);width:28px;">🔍</span>
+            <input type="number" id="cost-tp" step="0.01" min="0" style="width:70px;background:var(--navy3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-family:var(--mono);font-size:12px;">
+            <span style="font-size:11px;color:var(--dim);">/check</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:var(--muted);width:28px;">📰</span>
+            <input type="number" id="cost-nd" step="0.01" min="0" style="width:70px;background:var(--navy3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-family:var(--mono);font-size:12px;">
+            <span style="font-size:11px;color:var(--dim);">/distill</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;color:var(--muted);width:28px;">🛡️</span>
+            <input type="number" id="cost-sp" step="0.01" min="0" style="width:70px;background:var(--navy3);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 7px;font-family:var(--mono);font-size:12px;">
+            <span style="font-size:11px;color:var(--dim);">/analysis</span>
+          </div>
+        </div>
+        <button onclick="updateCosts()" style="width:100%;margin-top:10px;padding:6px;background:var(--navy3);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;">Save rates</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main" id="main-content">
+    <!-- rendered by JS -->
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const PROXY = '';  // same origin
+let DASH_PW = '';
+let currentView = 'all';
+
+const APP_META = {
+  tp: { name: 'TruthPrism', cls: 'tp', icon: '🔍', url: 'https://app.truthprism.app/admin' },
+  nd: { name: 'News-Distiller', cls: 'nd', icon: '📰', url: 'https://app.news-distiller.com/admin' },
+  sp: { name: 'ScamPrism', cls: 'sp', icon: '🛡️', url: 'https://app.scamprism.com/admin' },
+};
+
+const state = {
+  tp: { pw: '', codes: null, loading: false, err: null, sortBy: 'default', sortDir: 'desc' },
+  nd: { pw: '', codes: null, loading: false, err: null, sortBy: 'default', sortDir: 'desc' },
+  sp: { pw: '', codes: null, loading: false, err: null, sortBy: 'default', sortDir: 'desc' },
+};
+let autoRefreshInterval = null;
+let autoRefreshMins = 0;
+// ── Usage tracking ───────────────────────────────────────────────────────
+// Stored in localStorage under 'pkl_usage':
+// {
+//   yesterday: { date: 'YYYY-MM-DD', tp: N, nd: N, sp: N, total: N },
+//   today:     { date: 'YYYY-MM-DD', tp: N, nd: N, sp: N, total: N },
+//   allTime:   { tp: N, nd: N, sp: N, total: N },
+//   lastSeen:  { tp: N, nd: N, sp: N }   // last raw use_count per app (for delta math)
+// }
+
+const COST_DEFAULTS = { tp: 0.07, nd: 0.02, sp: 0.03 };
+const COST_PER_USE = (function() {
+  try {
+    const saved = localStorage.getItem('pkl_costs');
+    return saved ? Object.assign({}, COST_DEFAULTS, JSON.parse(saved)) : Object.assign({}, COST_DEFAULTS);
+  } catch(e) { return Object.assign({}, COST_DEFAULTS); }
+})();
+
+function saveCosts() {
+  try { localStorage.setItem('pkl_costs', JSON.stringify(COST_PER_USE)); } catch(e) {}
+}
+
+let usage = null;
+
+function todayPST() {
+  // Returns 'YYYY-MM-DD' in PST (UTC-8, ignoring DST for simplicity)
+  const d = new Date(Date.now() - 8 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+function loadUsage() {
+  try {
+    const raw = localStorage.getItem('pkl_usage');
+    usage = raw ? JSON.parse(raw) : null;
+  } catch(e) { usage = null; }
+  if (!usage) {
+    usage = {
+      yesterday: null,
+      today: { date: todayPST(), tp: 0, nd: 0, sp: 0, total: 0 },
+      allTime:   { tp: 0, nd: 0, sp: 0, total: 0 },
+      lastSeen:  { tp: null, nd: null, sp: null },
+      daily:     {}
+    };
+  }
+  if (!usage.daily) usage.daily = {};
+  // Recovery: if allTime is all zeros but lastSeen has real values, seed allTime from lastSeen
+  const allTimeEmpty = ['tp','nd','sp'].every(id => !usage.allTime[id]);
+  const lastSeenHasData = ['tp','nd','sp'].some(id => usage.lastSeen[id] > 0);
+  if (allTimeEmpty && lastSeenHasData) {
+    for (const id of ['tp','nd','sp']) {
+      usage.allTime[id] = usage.lastSeen[id] || 0;
+    }
+    usage.allTime.total = ['tp','nd','sp'].reduce((s, id) => s + (usage.allTime[id] || 0), 0);
+    saveUsage();
+  }
+}
+
+function saveUsage() {
+  try { localStorage.setItem('pkl_usage', JSON.stringify(usage)); } catch(e) {}
+}
+
+function rolloverIfNeeded() {
+  const today = todayPST();
+  if (usage.today.date !== today) {
+    // Midnight rolled over — archive today as yesterday, reset today
+    usage.yesterday = { ...usage.today };
+    usage.today = { date: today, tp: 0, nd: 0, sp: 0, total: 0 };
+  }
+}
+
+function updateUsageFromSnap(snap) {
+  // snap.byApp[id].uses = current raw cumulative use count from the app
+  rolloverIfNeeded();
+  let firstRun = false;
+  for (const id of ['tp', 'nd', 'sp']) {
+    const curr = snap.byApp[id]?.uses ?? null;
+    if (curr === null) continue;
+    const prev = usage.lastSeen[id];
+    if (prev !== null && curr >= prev) {
+      const gained = curr - prev;
+      if (gained > 0) {
+        usage.today[id]   = (usage.today[id]   || 0) + gained;
+        usage.today.total = (usage.today.total  || 0) + gained;
+        usage.allTime[id]   = (usage.allTime[id]   || 0) + gained;
+        usage.allTime.total = (usage.allTime.total  || 0) + gained;
+      }
+    } else if (prev === null) {
+      // First time seeing this app — seed allTime from current raw count
+      usage.allTime[id] = curr;
+      firstRun = true;
+    }
+    usage.lastSeen[id] = curr;
+  }
+  // Recalculate allTime.total cleanly from per-app values to avoid double-add bugs
+  if (firstRun) {
+    usage.allTime.total = ['tp','nd','sp'].reduce((s, id) => s + (usage.allTime[id] || 0), 0);
+  }
+  // Record today's total in daily history
+  usage.daily[usage.today.date] = usage.today.total;
+  // Keep only last 30 days
+  var dailyKeys = Object.keys(usage.daily).sort();
+  if (dailyKeys.length > 30) {
+    dailyKeys.slice(0, dailyKeys.length - 30).forEach(function(k) { delete usage.daily[k]; });
+  }
+  saveUsage();
+}
+
+loadUsage();
+
+function updateCosts() {
+  const tp = parseFloat(document.getElementById('cost-tp').value);
+  const nd = parseFloat(document.getElementById('cost-nd').value);
+  const sp = parseFloat(document.getElementById('cost-sp').value);
+  if (isNaN(tp) || isNaN(nd) || isNaN(sp)) { toast('Enter valid numbers', 'err'); return; }
+  COST_PER_USE.tp = tp;
+  COST_PER_USE.nd = nd;
+  COST_PER_USE.sp = sp;
+  saveCosts();
+  toast('Rates saved');
+  render();
+}
+
+function exportCSV() {
+  var rows = [['App','Code','Label','Platform','Status','Uses','Max Uses','Age (days)','Last Used','Created At']];
+  ['tp','nd','sp'].forEach(function(id) {
+    if (!state[id].codes) return;
+    state[id].codes.forEach(function(c) {
+      var days = c.created_at ? Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000) : '';
+      var lastUsed = c.last_used ? c.last_used.slice(0,10) : '';
+      rows.push([
+        APP_META[id].name,
+        c.code,
+        c.label || '',
+        c.platform || '',
+        c.active ? 'active' : 'disabled',
+        c.use_count || 0,
+        c.max_uses || '',
+        days,
+        lastUsed,
+        c.created_at ? c.created_at.slice(0,10) : ''
+      ]);
+    });
+  });
+  var csv = rows.map(function(r) {
+    return r.map(function(v) { return '"' + String(v).replace(/"/g,'""') + '"'; }).join(',');
+  }).join(String.fromCharCode(10));
+  var blob = new Blob([csv], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'pkl-admin-codes-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  toast('CSV exported');
+}
+
+function setAutoRefresh(mins) {
+  autoRefreshMins = parseInt(mins) || 0;
+  if (autoRefreshInterval) { clearInterval(autoRefreshInterval); autoRefreshInterval = null; }
+  if (autoRefreshMins > 0) {
+    autoRefreshInterval = setInterval(function() { fetchAll(); }, autoRefreshMins * 60 * 1000);
+  }
+}
+
+function showExtend(btn) {
+  const code = btn.dataset.code;
+  const appId = btn.dataset.app;
+  const currentMax = btn.dataset.max;
+  const newMax = prompt('Set new max uses for "' + code + '" (currently: ' + (currentMax || 'unlimited') + '):', currentMax || '');
+  if (newMax === null) return;
+  const parsed = parseInt(newMax);
+  if (isNaN(parsed) || parsed < 0) { toast('Enter a valid number', 'err'); return; }
+  updateMaxUses(appId, code, parsed);
+}
+
+async function updateMaxUses(appId, code, maxUses) {
+  try {
+    const r = await fetch('/api/proxy/codes/' + appId + '/' + encodeURIComponent(code) + '/update', {
+      method: 'POST',
+      headers: { 'X-Admin-Password': DASH_PW, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ max_uses: maxUses })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    toast('Max uses updated to ' + maxUses + ' for ' + code);
+    fetchApp(appId);
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+function doLogin() {
+  const pw = document.getElementById('gate-pw').value.trim();
+  if (!pw) return;
+  DASH_PW = pw;
+  document.getElementById('gate-err').textContent = 'Verifying…';
+  fetch('/api/apps', { headers: { 'X-Admin-Password': pw } })
+    .then(r => {
+      if (r.status === 401) throw new Error('Wrong password');
+      return r.json();
+    })
+    .then(() => {
+      document.getElementById('login-gate').style.display = 'none';
+      document.getElementById('app-shell').style.display = 'grid';
+      document.getElementById('dash-pw-display').value = '••••••••';
+      document.getElementById('cost-tp').value = COST_PER_USE.tp;
+      document.getElementById('cost-nd').value = COST_PER_USE.nd;
+      document.getElementById('cost-sp').value = COST_PER_USE.sp;
+      render();
+      fetchAll();
+    })
+    .catch(e => {
+      document.getElementById('gate-err').textContent = e.message === 'Wrong password' ? 'Incorrect password.' : 'Could not reach server.';
+    });
+}
+
+function showView(id) {
+  currentView = id;
+  document.querySelectorAll('.app-btn').forEach(b => {
+    b.classList.remove('active','tp','nd','sp');
+  });
+  const btn = document.getElementById('nav-' + id);
+  btn.classList.add('active');
+  if (id !== 'all') btn.classList.add(id);
+  render();
+}
+
+function getSnapshot() {
+  let totalCodes = 0, activeCodes = 0, totalUses = 0, appsLoaded = 0;
+  const byApp = {};
+  for (const id of ['tp','nd','sp']) {
+    if (state[id].codes) {
+      appsLoaded++;
+      const uses = state[id].codes.reduce((s, c) => s + (c.use_count || 0), 0);
+      const active = state[id].codes.filter(c => c.active).length;
+      byApp[id] = { uses, active, total: state[id].codes.length };
+      totalCodes += state[id].codes.length;
+      activeCodes += active;
+      totalUses += uses;
+    }
+  }
+  return { totalCodes, activeCodes, totalUses, appsLoaded, byApp };
+}
+
+function delta(curr, prev, key) {
+  if (!prev || prev[key] === undefined) return '';
+  const diff = curr[key] - prev[key];
+  if (diff === 0) return '<span style="color:var(--dim);font-size:11px;font-family:var(--mono);">—</span>';
+  const color = (key === 'totalUses' || key === 'activeCodes') && diff > 0 ? 'var(--success)' : diff < 0 ? 'var(--danger)' : 'var(--muted)';
+  const sign = diff > 0 ? '+' : '';
+  return `<span style="color:${color};font-size:11px;font-family:var(--mono);">${sign}${diff}</span>`;
+}
+
+function appDeltaRow(snap, prev, appId) {
+  if (!prev || !prev.byApp) return '';
+  const curr = snap.byApp[appId];
+  const p = prev.byApp[appId];
+  if (!curr || !p) return '';
+  const usesDiff = curr.uses - p.uses;
+  const activeDiff = curr.active - p.active;
+  if (usesDiff === 0 && activeDiff === 0) return '';
+  const parts = [];
+  if (usesDiff !== 0) {
+    const color = usesDiff > 0 ? 'var(--success)' : 'var(--danger)';
+    parts.push(`<span style="color:${color}">${usesDiff > 0 ? '+' : ''}${usesDiff} use${Math.abs(usesDiff) !== 1 ? 's' : ''}</span>`);
+  }
+  if (activeDiff !== 0) {
+    const color = activeDiff > 0 ? 'var(--success)' : 'var(--danger)';
+    parts.push(`<span style="color:${color}">${activeDiff > 0 ? '+' : ''}${activeDiff} active</span>`);
+  }
+  return parts.join(' · ');
+}
+
+function renderUsagePanel() {
+  if (!usage) return '';
+  const IDS = ['tp','nd','sp'];
+  const fmt = function(n) { return '$' + n.toFixed(2); };
+  var h = '';
+  h += '<div style="background:var(--navy2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px;">';
+  h += '<div style="display:grid;grid-template-columns:140px 1fr 1fr 1fr 1fr;align-items:center;gap:0;">';
+
+  // Header row
+  h += '<div></div>';
+  IDS.forEach(function(id) {
+    h += '<div style="font-size:15px;font-weight:600;color:var(--text);padding-bottom:10px;border-bottom:1px solid var(--border);">' + APP_META[id].icon + ' ' + APP_META[id].name + '</div>';
+  });
+  h += '<div style="font-size:15px;font-weight:600;color:var(--text);padding-bottom:10px;border-bottom:1px solid var(--border);">&#x2B21; Total</div>';
+
+  var cell = function(val, style) { return '<div style="' + style + '">' + val + '</div>'; };
+  var label = function(txt) { return '<div style="font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;color:var(--dim);padding:4px 0;">' + txt + '</div>'; };
+
+  // All time
+  h += label('All time');
+  IDS.forEach(function(id) { h += cell(usage.allTime[id] || 0, 'font-size:22px;font-weight:600;color:var(--text);padding:10px 0 4px;'); });
+  h += cell(usage.allTime.total || 0, 'font-size:22px;font-weight:600;color:var(--text);padding:10px 0 4px;');
+
+  // Yesterday
+  var ydLabel = 'Yesterday' + (usage.yesterday ? '<br><span style="font-size:10px;color:var(--dim);text-transform:none;">' + usage.yesterday.date + '</span>' : '');
+  h += label(ydLabel);
+  IDS.forEach(function(id) { h += cell(usage.yesterday ? (usage.yesterday[id] || 0) : '&mdash;', 'font-size:22px;font-weight:600;color:var(--muted);padding:4px 0;'); });
+  h += cell(usage.yesterday ? (usage.yesterday.total || 0) : '&mdash;', 'font-size:22px;font-weight:600;color:var(--muted);padding:4px 0;');
+
+  // Today
+  h += label('Today<br><span style="font-size:10px;color:var(--dim);text-transform:none;">' + usage.today.date + '</span>');
+  IDS.forEach(function(id) { h += cell(usage.today[id] || 0, 'font-size:22px;font-weight:600;color:var(--success);padding:4px 0;'); });
+  h += cell(usage.today.total || 0, 'font-size:22px;font-weight:600;color:var(--success);padding:4px 0;');
+
+  // vs yesterday
+  h += label('vs yesterday');
+  IDS.forEach(function(id) {
+    if (!usage.yesterday) { h += cell('&mdash;', 'font-size:14px;color:var(--dim);padding:4px 0 0;'); return; }
+    var d = (usage.today[id]||0) - (usage.yesterday[id]||0);
+    var color = d > 0 ? 'var(--success)' : d < 0 ? 'var(--danger)' : 'var(--dim)';
+    h += cell(d === 0 ? '&mdash;' : (d > 0 ? '+' : '') + d, 'font-size:14px;font-family:var(--mono);color:' + color + ';padding:4px 0 0;');
+  });
+  if (!usage.yesterday) {
+    h += cell('&mdash;', 'font-size:14px;color:var(--dim);padding:4px 0 0;');
+  } else {
+    var d = (usage.today.total||0) - (usage.yesterday.total||0);
+    var color = d > 0 ? 'var(--success)' : d < 0 ? 'var(--danger)' : 'var(--dim)';
+    h += cell(d === 0 ? '&mdash;' : (d > 0 ? '+' : '') + d, 'font-size:14px;font-family:var(--mono);color:' + color + ';padding:4px 0 0;');
+  }
+
+  // Divider
+  h += '<div style="grid-column:1/-1;border-top:1px solid var(--border);margin:10px 0 6px;"></div>';
+
+  // Est cost today
+  var tc = {tp:(usage.today.tp||0)*COST_PER_USE.tp, nd:(usage.today.nd||0)*COST_PER_USE.nd, sp:(usage.today.sp||0)*COST_PER_USE.sp};
+  var tt = tc.tp + tc.nd + tc.sp;
+  var ac = {tp:(usage.allTime.tp||0)*COST_PER_USE.tp, nd:(usage.allTime.nd||0)*COST_PER_USE.nd, sp:(usage.allTime.sp||0)*COST_PER_USE.sp};
+  var at = ac.tp + ac.nd + ac.sp;
+  h += label('Est. cost today');
+  IDS.forEach(function(id) { h += cell(fmt(tc[id]), 'font-size:18px;font-weight:600;color:var(--sp);padding:4px 0;'); });
+  h += cell(fmt(tt), 'font-size:18px;font-weight:600;color:var(--sp);padding:4px 0;');
+
+  h += label('Est. cost all time');
+  IDS.forEach(function(id) { h += cell(fmt(ac[id]), 'font-size:18px;font-weight:600;color:var(--muted);padding:4px 0 0;'); });
+  h += cell(fmt(at), 'font-size:18px;font-weight:600;color:var(--muted);padding:4px 0 0;');
+
+  // Rate note
+  h += '<div style="grid-column:1/-1;font-size:10px;font-family:var(--mono);color:var(--dim);margin-top:8px;">rates: TP $0.07/check &middot; ND $0.02/distill &middot; SP $0.03/analysis</div>';
+  h += '</div>';
+
+  // 7-day sparkline
+  var last7 = [];
+  var today = new Date();
+  for (var i = 6; i >= 0; i--) {
+    var d = new Date(today);
+    d.setDate(d.getDate() - i);
+    var key = d.toISOString().slice(0, 10);
+    last7.push({ date: key, val: usage.daily[key] || 0 });
+  }
+  var maxVal = Math.max(1, Math.max.apply(null, last7.map(function(x) { return x.val; })));
+  h += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">';
+  h += '<div style="font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;color:var(--dim);margin-bottom:8px;">7-day total uses</div>';
+  h += '<div style="display:flex;align-items:flex-end;gap:4px;height:40px;">';
+  last7.forEach(function(d) {
+    var barH = Math.max(2, Math.round((d.val / maxVal) * 40));
+    var isToday = d.date === today.toISOString().slice(0, 10);
+    var col = isToday ? 'var(--success)' : 'var(--tp)';
+    var dayLabel = new Date(d.date + 'T12:00:00').toLocaleDateString([], {weekday:'short'});
+    h += '<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:3px;" title="' + d.date + ': ' + d.val + ' uses">';
+    h += '<div style="font-size:10px;font-family:var(--mono);color:var(--dim);">' + (d.val || '') + '</div>';
+    h += '<div style="width:100%;background:' + col + ';border-radius:2px 2px 0 0;height:' + barH + 'px;opacity:' + (isToday ? '1' : '0.5') + ';"></div>';
+    h += '<div style="font-size:9px;font-family:var(--mono);color:var(--dim);">' + dayLabel + '</div>';
+    h += '</div>';
+  });
+  h += '</div>';
+
+  // Most active code across all apps
+  var allCodes = [];
+  ['tp','nd','sp'].forEach(function(id) {
+    if (state[id].codes) state[id].codes.forEach(function(c) {
+      allCodes.push({ app: APP_META[id].name, icon: APP_META[id].icon, code: c.code, label: c.label, uses: c.use_count || 0 });
+    });
+  });
+  if (allCodes.length > 0) {
+    allCodes.sort(function(a,b) { return b.uses - a.uses; });
+    var top = allCodes[0];
+    if (top.uses > 0) {
+      h += '<div style="margin-top:12px;display:flex;align-items:center;gap:10px;">';
+      h += '<span style="font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em;color:var(--dim);">Most active</span>';
+      h += '<span style="font-size:12px;color:var(--text);">' + top.icon + ' ' + top.code + '</span>';
+      h += '<span style="font-size:12px;color:var(--muted);">' + (top.label || '') + '</span>';
+      h += '<span style="font-size:12px;font-family:var(--mono);color:var(--success);">' + top.uses + ' uses</span>';
+      h += '<span style="font-size:11px;color:var(--dim);">(' + top.app + ')</span>';
+      h += '</div>';
+    }
+  }
+
+  h += '</div></div>';
+  return h;
+}
+
+function render() {
+  const mc = document.getElementById('main-content');
+  const ids = currentView === 'all' ? ['tp','nd','sp'] : [currentView];
+  const title = currentView === 'all' ? 'All Apps' : APP_META[currentView].name;
+
+  // Aggregate stats (from loaded data)
+  const snap = getSnapshot();
+  const { totalCodes, activeCodes, totalUses, appsLoaded } = snap;
+  const showStats = currentView === 'all' && appsLoaded > 0;
+
+  mc.innerHTML = `
+    <div class="page-header">
+      <div>
+        <div class="page-title">${title}</div>
+        <div class="page-sub">${currentView === 'all' ? 'Access code management across all apps' : APP_META[currentView].url}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="refresh-btn" onclick="exportCSV()" title="Export all codes to CSV">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+        <select id="auto-refresh-select" onchange="setAutoRefresh(this.value)" style="background:var(--navy3);border:1px solid var(--border2);border-radius:8px;color:var(--muted);font-family:var(--sans);font-size:13px;padding:7px 10px;cursor:pointer;">
+          <option value="0">Auto-refresh: off</option>
+          <option value="5">Every 5 min</option>
+          <option value="15">Every 15 min</option>
+          <option value="30">Every 30 min</option>
+        </select>
+        <button class="refresh-btn" onclick="fetchAll()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+        Refresh all
+      </button>
+      </div>
+    </div>
+    ${showStats ? `
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Total codes</div><div class="stat-val">${totalCodes}</div></div>
+      <div class="stat-card"><div class="stat-label">Active codes</div><div class="stat-val" style="color:var(--success)">${activeCodes}</div></div>
+      <div class="stat-card"><div class="stat-label">Inactive</div><div class="stat-val" style="color:var(--dim)">${totalCodes - activeCodes}</div></div>
+      <div class="stat-card"><div class="stat-label">Current total uses</div><div class="stat-val">${totalUses}</div></div>
+    </div>
+    ${renderUsagePanel()}
+    ` : ''}
+    <div class="panels">
+      ${ids.map(id => renderPanel(id)).join('')}
+    </div>
+  `;
+}
+
+function sortCodes(codes, sortBy, sortDir) {
+  if (!codes || sortBy === 'default') return codes;
+  const mult = sortDir === 'desc' ? -1 : 1;
+  return [...codes].sort(function(a, b) {
+    var av, bv;
+    if (sortBy === 'uses')     { av = a.use_count || 0; bv = b.use_count || 0; }
+    else if (sortBy === 'label')    { av = (a.label||'').toLowerCase(); bv = (b.label||'').toLowerCase(); return mult * av.localeCompare(bv); }
+    else if (sortBy === 'code')     { av = (a.code||'').toLowerCase();  bv = (b.code||'').toLowerCase();  return mult * av.localeCompare(bv); }
+    else if (sortBy === 'max')      { av = a.max_uses === null ? Infinity : (a.max_uses||0); bv = b.max_uses === null ? Infinity : (b.max_uses||0); }
+    else if (sortBy === 'status')   { av = a.active ? 1 : 0; bv = b.active ? 1 : 0; }
+    else if (sortBy === 'platform') { av = (a.platform||'').toLowerCase(); bv = (b.platform||'').toLowerCase(); return mult * av.localeCompare(bv); }
+    else if (sortBy === 'age')      { av = a.created_at ? new Date(a.created_at).getTime() : 0; bv = b.created_at ? new Date(b.created_at).getTime() : 0; }
+    else if (sortBy === 'last_used'){ av = a.last_used ? new Date(a.last_used).getTime() : 0; bv = b.last_used ? new Date(b.last_used).getTime() : 0; }
+    else return 0;
+    return mult * (bv - av);
+  });
+}
+
+function sortIcon(id, col) {
+  const s = state[id];
+  if (s.sortBy !== col) return '<span style="color:var(--dim);font-size:9px;">⇅</span>';
+  return s.sortDir === 'desc'
+    ? '<span style="color:var(--tp);font-size:9px;">↓</span>'
+    : '<span style="color:var(--tp);font-size:9px;">↑</span>';
+}
+
+function cycleSort(id, col) {
+  const s = state[id];
+  if (s.sortBy === col) {
+    s.sortDir = s.sortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    s.sortBy = col;
+    s.sortDir = 'desc';
+  }
+  render();
+}
+
+function renderPanel(id) {
+  const m = APP_META[id];
+  const s = state[id];
+  const statusBadge = s.loading
+    ? `<span class="badge badge-loading"><span class="spinner" style="width:10px;height:10px;border-width:1.5px;display:inline-block;vertical-align:middle;margin-right:4px;"></span>Loading</span>`
+    : s.err ? `<span class="badge badge-err">Error</span>`
+    : s.codes ? `<span class="badge badge-ok">${s.codes.length} codes</span>`
+    : `<span class="badge badge-loading">Not fetched</span>`;
+
+  const sorted = sortCodes(s.codes, s.sortBy, s.sortDir);
+  const tableHTML = s.loading
+    ? `<div class="empty-state"><div class="spinner"></div></div>`
+    : s.err
+    ? `<div class="error-msg">${s.err}</div>`
+    : !s.codes
+    ? `<div class="empty-state">Click "Refresh all" to load codes</div>`
+    : s.codes.length === 0
+    ? `<div class="empty-state">No codes yet</div>`
+    : `<div class="codes-wrap"><table class="codes-table">
+        <tr>
+          <th onclick="cycleSort('${id}','code')" style="cursor:pointer;">Code ${sortIcon(id,'code')}</th>
+          <th onclick="cycleSort('${id}','label')" style="cursor:pointer;">Label ${sortIcon(id,'label')}</th>
+          <th onclick="cycleSort('${id}','status')" style="cursor:pointer;">Status ${sortIcon(id,'status')}</th>
+          <th onclick="cycleSort('${id}','platform')" style="cursor:pointer;">Platform ${sortIcon(id,'platform')}</th>
+          <th onclick="cycleSort('${id}','uses')" style="cursor:pointer;">Uses ${sortIcon(id,'uses')}</th>
+          <th onclick="cycleSort('${id}','max')" style="cursor:pointer;">Max ${sortIcon(id,'max')}</th>
+          <th onclick="cycleSort('${id}','age')" style="cursor:pointer;">Age ${sortIcon(id,'age')}</th>
+          <th onclick="cycleSort('${id}','last_used')" style="cursor:pointer;">Last Used ${sortIcon(id,'last_used')}</th>
+          <th>Actions</th>
+        </tr>
+        ${sorted.map(c => renderCodeRow(id, c)).join('')}
+      </table></div>`;
+
+  return `
+  <div class="panel" id="panel-${id}">
+    <div class="panel-header">
+      <div class="panel-title">
+        <span>${m.icon}</span>
+        <span>${m.name}</span>
+        <span class="badge badge-${m.cls}">${m.cls}</span>
+      </div>
+      <div class="panel-actions">
+        ${statusBadge}
+        <button class="small-btn" onclick="fetchApp('${id}')">Refresh</button>
+        <a href="${m.url}" target="_blank" rel="noopener" class="small-btn">Open admin ↗</a>
+      </div>
+    </div>
+    ${tableHTML}
+    ${renderCreateForm(id)}
+  </div>`;
+}
+
+function renderCodeRow(appId, c) {
+  const maxUses = c.max_uses || null;
+  const consumed = c.use_count || 0;
+  let pct = 0, usesDisplay;
+  if (appId === 'sp' && maxUses !== null) {
+    const total = consumed + maxUses;
+    pct = total > 0 ? Math.min(100, Math.round((consumed / total) * 100)) : 0;
+    const barColor = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--sp)' : 'var(--success)';
+    usesDisplay = '<div class="uses-bar-wrap"><div class="uses-bar-bg"><div class="uses-bar-fill" style="width:' + pct + '%;background:' + barColor + ';"></div></div><span class="uses-num">' + consumed + ' used \u00b7 ' + maxUses + ' left</span></div>';
+  } else if (maxUses) {
+    pct = Math.min(100, Math.round((consumed / maxUses) * 100));
+    const barColor = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--sp)' : 'var(--success)';
+    usesDisplay = '<div class="uses-bar-wrap"><div class="uses-bar-bg"><div class="uses-bar-fill" style="width:' + pct + '%;background:' + barColor + ';"></div></div><span class="uses-num">' + consumed + '/' + maxUses + '</span></div>';
+  } else {
+    usesDisplay = '<span class="uses-num">' + consumed + '</span>';
+  }
+  const barColor = pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--sp)' : 'var(--success)';
+  const platIcon = c.platform === 'ios' ? '\ud83c\udf4e iOS' : c.platform === 'chrome' ? '\ud83c\udf10 Chrome' : c.platform ? c.platform : '\u2014';
+  const platColor = c.platform === 'ios' ? 'var(--sp)' : c.platform === 'chrome' ? 'var(--tp)' : 'var(--dim)';
+  var ageDays = '\u2014';
+  if (c.created_at) {
+    var days = Math.floor((Date.now() - new Date(c.created_at).getTime()) / 86400000);
+    ageDays = days === 0 ? 'today' : days + 'd';
+  }
+  var lastUsedStr = '\u2014';
+  if (c.last_used) {
+    var luDate = new Date(c.last_used);
+    var todayStr = new Date().toLocaleDateString();
+    var yestStr = new Date(Date.now() - 86400000).toLocaleDateString();
+    var luStr = luDate.toLocaleDateString();
+    lastUsedStr = luStr === todayStr ? 'today' : luStr === yestStr ? 'yesterday' : Math.floor((Date.now() - luDate.getTime()) / 86400000) + 'd ago';
+  }
+  var nearLimit = maxUses && pct >= 80;
+  var rowBg = nearLimit ? ' style="background:rgba(224,85,85,0.06);"' : '';
+  var nearBadge = nearLimit ? ' <span style="font-size:10px;color:var(--danger);">\u26a0</span>' : '';
+  var cells = '';
+  cells += '<td><span class="code-pill" onclick="copyText(this.dataset.code)" data-code="' + c.code + '" title="Click to copy">' + c.code + '</span>' + nearBadge + '</td>';
+  cells += '<td style="color:var(--muted)">' + (c.label || '\u2014') + '</td>';
+  cells += '<td><span class="' + (c.active ? 'status-active' : 'status-inactive') + '">' + (c.active ? '\u25cf active' : '\u25cb disabled') + '</span></td>';
+  cells += '<td style="font-size:12px;color:' + platColor + ';font-family:var(--mono);">' + platIcon + '</td>';
+  cells += '<td>' + usesDisplay + '</td>';
+  cells += '<td style="font-family:var(--mono);font-size:12px;color:var(--dim)">' + (maxUses || '\u221e') + '</td>';
+  cells += '<td style="font-family:var(--mono);font-size:11px;color:var(--dim)">' + ageDays + '</td>';
+  cells += '<td style="font-family:var(--mono);font-size:11px;color:var(--muted)">' + lastUsedStr + '</td>';
+  var extendBtn = (appId === 'tp' || appId === 'nd')
+    ? '<button class="act-btn" onclick="showExtend(this)" data-app="' + appId + '" data-code="' + c.code + '" data-max="' + (maxUses || '') + '">Extend</button>'
+    : '';
+  cells += '<td><div class="action-row">'
+    + '<button class="act-btn" onclick="toggleCode(this.dataset.app,this.dataset.code)" data-app="' + appId + '" data-code="' + c.code + '">' + (c.active ? 'Disable' : 'Enable') + '</button>'
+    + extendBtn
+    + '<button class="act-btn danger" onclick="deleteCode(this.dataset.app,this.dataset.code)" data-app="' + appId + '" data-code="' + c.code + '">Delete</button>'
+    + '</div></td>';
+  return '<tr' + rowBg + '>' + cells + '</tr>';
+}
+
+
+function renderCreateForm(id) {
+  const spExtra = id === 'sp' ? `
+      <div class="form-field">
+        <label>Email *</label>
+        <input type="email" id="new-email-${id}" class="w-md" placeholder="user@email.com">
+      </div>` : '';
+  const maxLabel = id === 'sp' ? 'Uses' : 'Max uses';
+  const maxPlaceholder = id === 'sp' ? '25' : '∞';
+  const platformField = (id === 'tp' || id === 'nd') ? `
+      <div class="form-field">
+        <label>Platform</label>
+        <select id="new-platform-${id}" style="background:var(--navy);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:12px;">
+          <option value="chrome">Chrome</option>
+          <option value="ios">iOS</option>
+        </select>
+      </div>` : '';
+  return `<div class="create-form">
+    <h4>New code${id === 'sp' ? ' — email required' : ''}</h4>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Code</label>
+        <input type="text" id="new-code-${id}" class="w-lg" placeholder="leave blank to auto-generate">
+      </div>
+      <div class="form-field">
+        <label>Label</label>
+        <input type="text" id="new-label-${id}" class="w-md" placeholder="description">
+      </div>
+      ${spExtra}
+      <div class="form-field">
+        <label>${maxLabel}</label>
+        <input type="number" id="new-max-${id}" class="w-sm" placeholder="${maxPlaceholder}">
+      </div>
+      ${platformField}
+      <button class="create-btn" onclick="createCode('${id}')">Create code +</button>
+    </div>
+  </div>`;
+}
+
+async function fetchApp(id) {
+  state[id].loading = true;
+  state[id].err = null;
+  state[id].codes = null;
+  render();
+  try {
+    const r = await fetch(`/api/proxy/codes/${id}`, {
+      headers: { 'X-Admin-Password': DASH_PW }
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+    state[id].codes = Array.isArray(data) ? data : (data.codes || data);
+    state[id].loading = false;
+  } catch(e) {
+    state[id].loading = false;
+    state[id].err = e.message;
+  }
+  render();
+}
+
+async function fetchAll() {
+  const ids = currentView === 'all' ? ['tp','nd','sp'] : [currentView];
+  await Promise.all(ids.map(id => fetchApp(id)));
+  // After fresh data lands, update usage counters
+  const snap = getSnapshot();
+  if (snap.appsLoaded > 0) updateUsageFromSnap(snap);
+  render();
+}
+
+async function toggleCode(appId, code) {
+  try {
+    const r = await fetch(`/api/proxy/codes/${appId}/${encodeURIComponent(code)}/toggle`, {
+      method: 'POST',
+      headers: { 'X-Admin-Password': DASH_PW }
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    toast('Code updated');
+    fetchApp(appId);
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+async function deleteCode(appId, code) {
+  if (!confirm(`Delete code "${code}"? This cannot be undone.`)) return;
+  try {
+    const r = await fetch(`/api/proxy/codes/${appId}/${encodeURIComponent(code)}/delete`, {
+      method: 'POST',
+      headers: { 'X-Admin-Password': DASH_PW }
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    toast('Code deleted');
+    fetchApp(appId);
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+async function createCode(appId) {
+  const code = document.getElementById('new-code-' + appId)?.value.trim();
+  const label = document.getElementById('new-label-' + appId)?.value.trim();
+  const maxRaw = document.getElementById('new-max-' + appId)?.value.trim();
+  let body = { code, label };
+  if (appId === 'sp') {
+    const email = document.getElementById('new-email-sp')?.value.trim();
+    if (!label) { toast('Label is required for ScamPrism', 'err'); return; }
+    if (!email) { toast('Email is required for ScamPrism', 'err'); return; }
+    body.email = email;
+    body.uses = maxRaw ? parseInt(maxRaw) : 25;
+  } else if (appId === 'tp' || appId === 'nd') {
+    const platform = document.getElementById('new-platform-' + appId)?.value || 'chrome';
+    body.max_uses = maxRaw ? parseInt(maxRaw) : null;
+    body.platform = platform;
+  } else {
+    body.max_uses = maxRaw ? parseInt(maxRaw) : null;
+  }
+  try {
+    const r = await fetch(`/api/proxy/codes/${appId}`, {
+      method: 'POST',
+      headers: { 'X-Admin-Password': DASH_PW, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error);
+    toast('Code created: ' + code);
+    fetchApp(appId);
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => toast('Copied: ' + text)).catch(() => toast('Copy failed', 'err'));
+}
+
+let toastTimer;
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = (type === 'ok' ? '✓ ' : '✕ ') + msg;
+  el.className = 'show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+document.getElementById('gate-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+</script>
+</body>
+</html>
