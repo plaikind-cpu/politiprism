@@ -112,6 +112,7 @@ def get_learning_stats():
         "relevant":         relevant,
         "not_relevant":     not_relevant,
         "sub_claims":       sub_claims,
+        "pf_seeds":         pf_seeds,
         "pct_rated":        round(total_rated / total_claims * 100) if total_claims else 0,
         "recent_accuracy":  recent_accuracy,
         "recent_total":     len(recent),
