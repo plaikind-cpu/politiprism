@@ -101,25 +101,90 @@ td { padding: 8px 10px; border-bottom: 1px solid #1e2135; color: #c8c8e0; vertic
     </form>
 </div>
 
-<div class="section">
+<div class="section" id="pf-section">
     <h2>PolitiFact Training Import</h2>
     <p style="color:#9d9db5;font-size:0.88rem;margin-bottom:14px;">
-        Import up to 100 recent Trump fact-checks from PolitiFact as training examples.
-        This pre-seeds the learning system with professionally curated, editorially
-        verified examples of statements worth checking — run this once to jump-start training.
+        Imports Trump fact-checks from PolitiFact as training examples — 
+        professionally curated statements worth checking, with verdicts pre-seeded.
+        Run once to jump-start training, re-run anytime to pick up new checks.
     </p>
-    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-        <a href="/admin/import-politifact"
-           onclick="return confirm('Import PolitiFact fact-checks as training data?')"
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+        <a href="/admin/import-politifact" id="pf-btn"
            style="background:#1e2a3d;color:#6ca0ff;border:1px solid #6ca0ff;
                   padding:8px 16px;border-radius:6px;font-size:0.85rem;text-decoration:none;">
             📥 Import PolitiFact Training Data
         </a>
-        <a href="/learning" style="color:#6c63ff;font-size:0.85rem;">
+        <span id="pf-indicator" style="display:none;color:#e0a84a;font-size:0.85rem;">
+            ⚙ <span id="pf-stage">Starting...</span>
+        </span>
+        <span id="pf-done" style="display:none;color:#4caf73;font-size:0.85rem;">
+            ✓ <span id="pf-done-msg"></span>
+        </span>
+        <a href="/learning" style="color:#6c63ff;font-size:0.85rem;margin-left:auto;">
             View Learning Dashboard →
         </a>
     </div>
+    <div id="pf-progress" style="display:none;">
+        <div style="background:#0f1117;border-radius:6px;height:6px;overflow:hidden;border:1px solid #2e3150;">
+            <div id="pf-bar" style="background:#6ca0ff;height:100%;width:0%;transition:width 0.5s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.78rem;color:#9d9db5;">
+            <span id="pf-count">Imported: 0</span>
+            <span id="pf-found">Found: 0</span>
+        </div>
+    </div>
 </div>
+
+<script>
+(function() {
+    var pfPoll = null;
+    var pfWasRunning = false;
+
+    function pollPF() {
+        fetch("/admin/pf-import-status", { credentials: "same-origin" })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var btn  = document.getElementById("pf-btn");
+                var ind  = document.getElementById("pf-indicator");
+                var done = document.getElementById("pf-done");
+                var prog = document.getElementById("pf-progress");
+                var bar  = document.getElementById("pf-bar");
+                var cnt  = document.getElementById("pf-count");
+                var fnd  = document.getElementById("pf-found");
+                var stg  = document.getElementById("pf-stage");
+                var dmsg = document.getElementById("pf-done-msg");
+
+                if (data.running) {
+                    pfWasRunning = true;
+                    btn.style.opacity = "0.4";
+                    btn.style.pointerEvents = "none";
+                    ind.style.display = "inline";
+                    done.style.display = "none";
+                    stg.textContent = data.stage || "Running...";
+                    var pct = data.found > 0 ? Math.round(data.imported / data.found * 100) : 0;
+                    prog.style.display = "block";
+                    bar.style.width = pct + "%";
+                    cnt.textContent = "Imported: " + data.imported;
+                    fnd.textContent = "Found: " + data.found;
+                } else {
+                    btn.style.opacity = "1";
+                    btn.style.pointerEvents = "auto";
+                    ind.style.display = "none";
+                    prog.style.display = "none";
+                    if (pfWasRunning || data.stage !== "idle") {
+                        done.style.display = "inline";
+                        dmsg.textContent = data.stage || "Complete";
+                        pfWasRunning = false;
+                    }
+                }
+            }).catch(function() {});
+    }
+
+    // Poll every 3s
+    pollPF();
+    pfPoll = setInterval(pollPF, 3000);
+})();
+</script>
 
 <div class="section" id="pipeline-section">
     <h2>Pipeline</h2>
